@@ -1,0 +1,45 @@
+# Dependencies and package-manager state
+node_modules/
+.pnp.*
+.pnpm-store/
+
+# Generated application and build output
+dist/
+.next/
+out/
+build/
+coverage/
+.turbo/
+.cache/
+*.tsbuildinfo
+next-env.d.ts
+
+# Local environment files. Keep safe templates in version control.
+.env
+.env.*
+!.env.example
+
+# Only the workspace-root lockfile is authoritative.
+/apps/web/pnpm-lock.yaml
+
+# Logs and temporary files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+*.swp
+*.swo
+*~
+
+# Local tooling state
+.vercel/
+.impeccable/config.local.json
+.impeccable/critique/
+
+# OS and private key files
+.DS_Store
+Thumbs.db
+*.pem
+*.key
+*.crt

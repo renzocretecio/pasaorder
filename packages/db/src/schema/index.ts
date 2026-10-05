@@ -1,0 +1,236 @@
+import { relations } from "drizzle-orm";
+import {
+  bigint,
+  boolean,
+  index,
+  integer,
+  jsonb,
+  numeric,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  varchar,
+} from "drizzle-orm/pg-core";
+
+export const orderStatusEnum = pgEnum("order_status", [
+  "NEW",
+  "CONFIRMED",
+  "PREPARING",
+  "READY",
+  "COMPLETED",
+  "CANCELLED",
+]);
+
+export const orderTypeEnum = pgEnum("order_type", [
+  "PICKUP",
+  "DELIVERY",
+  "DINE_IN",
+]);
+
+export const users = pgTable("users", {
+  id: bigint("id", { mode: "bigint" }).primaryKey().generatedAlwaysAsIdentity(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  tokenVersion: integer("token_version").notNull().default(0),
+  name: varchar("name", { length: 255 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const stores = pgTable("stores", {
+  id: bigint("id", { mode: "bigint" }).primaryKey().generatedAlwaysAsIdentity(),
+  ownerId: bigint("owner_id", { mode: "bigint" })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  slug: varchar("slug", { length: 120 }).notNull().unique(),
+  description: text("description"),
+  contactPhone: varchar("contact_phone", { length: 40 }),
+  address: text("address"),
+  operatingHours: jsonb("operating_hours"),
+  orderTypes: jsonb("order_types")
+    .$type<Array<"DINE_IN" | "PICKUP" | "DELIVERY">>()
+    .notNull()
+    .default(["DINE_IN", "PICKUP", "DELIVERY"]),
+  logoUrl: text("logo_url"),
+  bannerUrl: text("banner_url"),
+  isActive: boolean("is_active").notNull().default(true),
+  isPublished: boolean("is_published").notNull().default(false),
+  accentColor: varchar("accent_color", { length: 7 })
+    .notNull()
+    .default("#244d35"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const ownerPreferences = pgTable("owner_preferences", {
+  ownerId: bigint("owner_id", { mode: "bigint" })
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  defaultStoreId: bigint("default_store_id", { mode: "bigint" }).references(
+    () => stores.id,
+    { onDelete: "set null" },
+  ),
+});
+
+export const categories = pgTable("categories", {
+  id: bigint("id", { mode: "bigint" }).primaryKey().generatedAlwaysAsIdentity(),
+  storeId: bigint("store_id", { mode: "bigint" })
+    .notNull()
+    .references(() => stores.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const products = pgTable("products", {
+  id: bigint("id", { mode: "bigint" }).primaryKey().generatedAlwaysAsIdentity(),
+  categoryId: bigint("category_id", { mode: "bigint" })
+    .notNull()
+    .references(() => categories.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  price: numeric("price", { precision: 10, scale: 2 }).notNull(),
+  imageUrl: text("image_url"),
+  isAvailable: boolean("is_available").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const productVariants = pgTable(
+  "product_variants",
+  {
+    id: bigint("id", { mode: "bigint" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity(),
+    productId: bigint("product_id", { mode: "bigint" })
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    label: varchar("label", { length: 80 }).notNull(),
+    price: numeric("price", { precision: 10, scale: 2 }).notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+  },
+  (table) => [index("product_variants_product_id_idx").on(table.productId)],
+);
+
+export const orders = pgTable("orders", {
+  id: bigint("id", { mode: "bigint" }).primaryKey().generatedAlwaysAsIdentity(),
+  storeId: bigint("store_id", { mode: "bigint" })
+    .notNull()
+    .references(() => stores.id, { onDelete: "cascade" }),
+  customerId: bigint("customer_id", { mode: "bigint" }).references(
+    () => users.id,
+    { onDelete: "restrict" },
+  ),
+  customerName: varchar("customer_name", { length: 120 }).notNull(),
+  customerPhone: varchar("customer_phone", { length: 40 }),
+  deliveryAddress: text("delivery_address"),
+  tableNumber: varchar("table_number", { length: 40 }),
+  trackingToken: varchar("tracking_token", { length: 36 }).notNull().unique(),
+  idempotencyKey: varchar("idempotency_key", { length: 36 }).notNull().unique(),
+  status: orderStatusEnum("status").notNull().default("NEW"),
+  orderType: orderTypeEnum("order_type").notNull().default("PICKUP"),
+  deliveryFee: numeric("delivery_fee", { precision: 10, scale: 2 }),
+  total: numeric("total", { precision: 10, scale: 2 }).notNull().default("0"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const orderItems = pgTable("order_items", {
+  id: bigint("id", { mode: "bigint" }).primaryKey().generatedAlwaysAsIdentity(),
+  orderId: bigint("order_id", { mode: "bigint" })
+    .notNull()
+    .references(() => orders.id, { onDelete: "cascade" }),
+  productId: bigint("product_id", { mode: "bigint" })
+    .notNull()
+    .references(() => products.id, { onDelete: "restrict" }),
+  productName: varchar("product_name", { length: 255 }).notNull(),
+  optionLabel: varchar("option_label", { length: 80 }),
+  specialInstructions: varchar("special_instructions", { length: 500 }),
+  quantity: integer("quantity").notNull(),
+  unitPrice: numeric("unit_price", { precision: 10, scale: 2 }).notNull(),
+  subtotal: numeric("subtotal", { precision: 10, scale: 2 }).notNull(),
+});
+
+export const usersRelations = relations(users, ({ many }) => ({
+  stores: many(stores),
+  orders: many(orders),
+}));
+
+export const storesRelations = relations(stores, ({ one, many }) => ({
+  owner: one(users, {
+    fields: [stores.ownerId],
+    references: [users.id],
+  }),
+  categories: many(categories),
+  orders: many(orders),
+}));
+
+export const categoriesRelations = relations(categories, ({ one, many }) => ({
+  store: one(stores, {
+    fields: [categories.storeId],
+    references: [stores.id],
+  }),
+  products: many(products),
+}));
+
+export const productsRelations = relations(products, ({ one, many }) => ({
+  category: one(categories, {
+    fields: [products.categoryId],
+    references: [categories.id],
+  }),
+  orderItems: many(orderItems),
+  variants: many(productVariants),
+}));
+
+export const productVariantsRelations = relations(
+  productVariants,
+  ({ one }) => ({
+    product: one(products, {
+      fields: [productVariants.productId],
+      references: [products.id],
+    }),
+  }),
+);
+
+export const ordersRelations = relations(orders, ({ one, many }) => ({
+  store: one(stores, {
+    fields: [orders.storeId],
+    references: [stores.id],
+  }),
+  customer: one(users, {
+    fields: [orders.customerId],
+    references: [users.id],
+  }),
+  items: many(orderItems),
+}));
+
+export const orderItemsRelations = relations(orderItems, ({ one }) => ({
+  order: one(orders, {
+    fields: [orderItems.orderId],
+    references: [orders.id],
+  }),
+  product: one(products, {
+    fields: [orderItems.productId],
+    references: [products.id],
+  }),
+}));
+
+export const schema = {
+  users,
+  stores,
+  categories,
+  products,
+  productVariants,
+  orders,
+  orderItems,
+};

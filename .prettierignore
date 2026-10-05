@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.next/
+build/
+coverage/
+pnpm-lock.yaml
+packages/db/drizzle/migrations/
+docs/original-project-guide.md
+apps/web/AGENTS.md
+apps/web/CLAUDE.md
+.env
+.env.*
+
+# Vendored agent tooling retains upstream formatting.
+.agents/skills/
