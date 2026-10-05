@@ -4,7 +4,7 @@ import { Trash2, Upload } from "lucide-react";
 import { CatalogImage } from "./catalog-image";
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-type ImageKind = "logo" | "banner" | "product";
+type ImageKind = "logo" | "banner" | "product" | "payment-qr";
 
 export function ImageUpload({
   id,
@@ -15,7 +15,7 @@ export function ImageUpload({
   describedBy,
 }: {
   id: string;
-  name: "logoUrl" | "bannerUrl" | "imageUrl";
+  name: "logoUrl" | "bannerUrl" | "imageUrl" | "paymentQrUrl";
   initialUrl: string;
   kind: ImageKind;
   invalid: boolean;
@@ -75,12 +75,16 @@ export function ImageUpload({
               ? "No photo"
               : kind === "banner"
                 ? "No banner"
-                : undefined
+                : kind === "payment-qr"
+                  ? "No QR"
+                  : undefined
           }
           className={
             kind === "banner"
               ? "aspect-[3/1] w-full max-w-xl rounded-xl"
-              : "size-16 rounded-xl"
+              : kind === "payment-qr"
+                ? "size-28 rounded-xl"
+                : "size-16 rounded-xl"
           }
         />
         <div>
@@ -89,7 +93,11 @@ export function ImageUpload({
             className="relative inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border bg-card px-4 text-sm font-medium hover:bg-muted focus-within:outline-2 focus-within:outline-ring"
           >
             <Upload className="size-4" aria-hidden="true" />
-            {kind === "banner" ? "Choose banner" : "Choose image"}
+            {kind === "banner"
+              ? "Choose banner"
+              : kind === "payment-qr"
+                ? "Choose GCash QR"
+                : "Choose image"}
             <input
               ref={fileInput}
               id={id}
@@ -99,7 +107,9 @@ export function ImageUpload({
                   ? "logoFile"
                   : kind === "banner"
                     ? "bannerFile"
-                    : "imageFile"
+                    : kind === "payment-qr"
+                      ? "paymentQrFile"
+                      : "imageFile"
               }
               accept="image/jpeg,image/png,image/webp"
               aria-invalid={invalid}
@@ -109,7 +119,9 @@ export function ImageUpload({
                   ? "Choose store logo"
                   : kind === "banner"
                     ? "Choose store banner"
-                    : "Choose product image"
+                    : kind === "payment-qr"
+                      ? "Choose GCash payment QR"
+                      : "Choose product image"
               }
               onChange={chooseImage}
               className="absolute inset-0 size-full cursor-pointer opacity-0"

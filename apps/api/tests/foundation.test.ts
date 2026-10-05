@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 import sharp from "sharp";
 import {
   setupStoreSchema,
+  catalogStoreSettingsSchema,
   createOrderSchema,
   createProductSchema,
   catalogItemSchema,
@@ -246,6 +247,45 @@ test("store banners keep a wide aspect ratio when normalized to WebP", async () 
   assert.equal(result.width, 1920);
   assert.equal(result.height, 720);
 });
+test("GCash configuration requires valid account details when enabled", () => {
+  assert.equal(
+    catalogStoreSettingsSchema.safeParse({
+      name: "Corner Shop",
+      paymentMethods: ["CASH"],
+    }).success,
+    true,
+  );
+  assert.equal(
+    catalogStoreSettingsSchema.safeParse({
+      name: "Corner Shop",
+      paymentMethods: ["GCASH"],
+    }).success,
+    false,
+  );
+  assert.equal(
+    catalogStoreSettingsSchema.safeParse({
+      name: "Corner Shop",
+      paymentMethods: ["GCASH"],
+      gcashAccountName: "Corner Shop",
+      gcashNumber: "09171234567",
+      gcashQrUrl: "/api/images/test/123e4567-e89b-12d3-a456-426614174000.webp",
+    }).success,
+    true,
+  );
+});
+test("payment QR images are normalized to a square upload size", async () => {
+  const source = await sharp({
+    create: { width: 1800, height: 1800, channels: 3, background: "#ffffff" },
+  })
+    .png()
+    .toBuffer();
+  const result = await sharp(
+    await prepareImage(source, "payment-qr"),
+  ).metadata();
+  assert.equal(result.format, "webp");
+  assert.equal(result.width, 1000);
+  assert.equal(result.height, 1000);
+});
 test("schemas preserve bigint IDs and reject invalid input", () => {
   assert.equal(idSchema.parse("9007199254740993"), "9007199254740993");
   for (const value of ["0", "-1", "1.5", "9223372036854775808", 1])
@@ -285,6 +325,7 @@ test("dine-in orders do not require a phone number and accept an optional table"
     idempotencyKey: "123e4567-e89b-12d3-a456-426614174000",
     customerName: "Customer",
     orderType: "DINE_IN",
+    paymentMethod: "CASH",
     items: [{ productId: "1", variantId: null, quantity: 1 }],
   };
   assert.equal(
@@ -292,6 +333,11 @@ test("dine-in orders do not require a phone number and accept an optional table"
     true,
   );
   assert.equal(createOrderSchema.safeParse(dineInOrder).success, true);
+  assert.equal(
+    createOrderSchema.safeParse({ ...dineInOrder, paymentMethod: "CRYPTO" })
+      .success,
+    false,
+  );
   assert.equal(
     createOrderSchema.safeParse({
       ...dineInOrder,

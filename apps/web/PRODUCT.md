@@ -28,12 +28,12 @@ The product connects a store's public QR/link ordering flow with its order works
 
 ## Capabilities and Constraints
 
-- Owner authentication, store setup, contact phone, address, weekly operating hours, store banners, configurable dine-in/to-go/delivery options, category and item editing, optional size/piece variants with individual prices, image uploads, availability, accent customization, private preview, catalog publishing, public menu links, and downloadable menu QR codes exist. Guest checkout and a basic owner order queue with status updates exist. For delivery, the store sets the fee per order when confirming it. Cash/GCash setup and verification, expanded order operations, and Meta integrations remain planned.
+- Owner authentication, store setup, contact phone, address, weekly operating hours, store banners, configurable dine-in/to-go/delivery options, category and item editing, optional size/piece variants with individual prices, image uploads, availability, accent customization, private preview, catalog publishing, public menu links, and downloadable menu QR codes exist. Guest checkout and a basic owner order queue with status updates exist. Stores can enable Cash and/or GCash, add copyable GCash account details and an optional QR image, and customers choose a method at checkout. Orders snapshot GCash instructions and track payment status independently; owners manually mark payment paid or unpaid. For delivery, the store sets the fee per order when confirming it. Automatic payment confirmation, payment gateways, and Meta integrations remain planned.
 - Store logos, banners, and product images can be uploaded to OCI Object Storage or supplied by public HTTPS URL. Uploaded images are normalized to WebP and served through the app; custom modifiers remain planned. Drafts and inactive stores are not public; publishing requires an available item. Saved edits to published catalogs go live immediately. Making the last item unavailable unpublishes the catalog.
 - Each store belongs directly to an owner, with categories, products, and orders attached to stores.
 - Public menu ordering is intended to work without requiring a customer account.
 - Pickup, delivery, and dine-in are the selected first-release order types.
-- GCash copyable details and a downloadable QR are planned manual payment instructions. Automatic payment confirmation or a payment gateway has not been decided.
+- GCash copyable details and an optional downloadable QR are manual payment instructions. Store owners verify payment from their GCash account and update the order; automatic payment confirmation or a payment gateway has not been decided.
 - Premium chat extraction creates an editable draft for owner review and confirmation. The choice of Jev or Laya and the LLM provider remains open.
 - Customer research, subscription terms, and pricing have not been established.
 

@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   createOrderSchema,
   idSchema,
+  updatePaymentStatusSchema,
   updateOrderStatusSchema,
 } from "@pasaorder/validation";
 import { AppError } from "../../middleware/errors.js";
@@ -27,6 +28,15 @@ ownerOrdersRouter.patch("/:id/status", async (req, res) => {
     req.auth!.userId,
     idSchema.parse(req.params.id),
     updateOrderStatusSchema.parse(req.body),
+  );
+  emitOrdersChanged(storeId);
+  res.sendStatus(204);
+});
+ownerOrdersRouter.patch("/:id/payment", async (req, res) => {
+  const { storeId } = await repository.updateOwnerOrderPayment(
+    req.auth!.userId,
+    idSchema.parse(req.params.id),
+    updatePaymentStatusSchema.parse(req.body).status,
   );
   emitOrdersChanged(storeId);
   res.sendStatus(204);

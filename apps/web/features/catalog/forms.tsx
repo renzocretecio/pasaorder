@@ -17,6 +17,7 @@ import {
   type OrderType,
   type Product,
   type Weekday,
+  type PaymentMethod,
 } from "@pasaorder/types";
 import {
   catalogAction,
@@ -244,6 +245,9 @@ export function StoreForm({ store }: { store?: CatalogStore }) {
   const [selectedOrderTypes, setSelectedOrderTypes] = useState<OrderType[]>(
     store?.orderTypes ?? [...orderTypes],
   );
+  const [selectedPaymentMethods, setSelectedPaymentMethods] = useState<
+    PaymentMethod[]
+  >(store?.paymentMethods ?? ["CASH"]);
   return (
     <form
       ref={formRef}
@@ -465,6 +469,115 @@ export function StoreForm({ store }: { store?: CatalogStore }) {
             </div>
           )}
         </Field>
+        <section
+          className="space-y-4 border-t pt-5"
+          aria-labelledby="payment-settings-title"
+        >
+          <div>
+            <h2
+              id="payment-settings-title"
+              className="text-[18px] font-semibold tracking-[-0.01em]"
+            >
+              Payment options
+            </h2>
+            <p className="mt-1 text-[13px] text-muted-foreground">
+              Choose what customers can use at checkout. You’ll confirm payments
+              yourself.
+            </p>
+          </div>
+          <fieldset className="space-y-3">
+            <legend className="sr-only">Available payment methods</legend>
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  { value: "CASH", label: "Cash" },
+                  { value: "GCASH", label: "GCash" },
+                ] as const
+              ).map((method) => {
+                const selected = selectedPaymentMethods.includes(method.value);
+                return (
+                  <label
+                    key={method.value}
+                    className={`flex min-h-12 cursor-pointer items-center gap-2 rounded-xl border px-4 text-sm font-medium ${selected ? "border-primary bg-secondary text-primary" : "bg-card"}`}
+                  >
+                    <input
+                      type="checkbox"
+                      name={`paymentMethod_${method.value}`}
+                      checked={selected}
+                      onChange={(event) =>
+                        setSelectedPaymentMethods((current) =>
+                          event.target.checked
+                            ? [...current, method.value]
+                            : current.filter((value) => value !== method.value),
+                        )
+                      }
+                      className="size-4 accent-primary"
+                    />
+                    {method.label}
+                  </label>
+                );
+              })}
+            </div>
+            {state.errors?.paymentMethods && (
+              <p role="alert" className="text-sm text-destructive">
+                {state.errors.paymentMethods.join(" ")}
+              </p>
+            )}
+          </fieldset>
+          {selectedPaymentMethods.includes("GCASH") && (
+            <div className="space-y-4 rounded-2xl border bg-card p-4 sm:p-5">
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Customers will see these details after choosing GCash. Add a QR
+                image if you have one; account details are required either way.
+              </p>
+              <Field
+                name="gcashAccountName"
+                label="GCash account name"
+                state={state}
+                required
+                maxLength={120}
+                defaultValue={
+                  state.values?.gcashAccountName ??
+                  store?.gcashAccountName ??
+                  ""
+                }
+                placeholder="Name registered with GCash"
+              />
+              <Field
+                name="gcashNumber"
+                label="GCash mobile number"
+                state={state}
+                required
+                type="tel"
+                maxLength={40}
+                defaultValue={
+                  state.values?.gcashNumber ?? store?.gcashNumber ?? ""
+                }
+                placeholder="e.g. 0917 123 4567"
+              />
+              <Field
+                name="paymentQrUrl"
+                label="GCash QR code"
+                state={state}
+                hint="Optional · JPG, PNG, or WebP · up to 5 MB"
+              >
+                {(control) => (
+                  <ImageUpload
+                    key={state.values?.paymentQrUrl || store?.gcashQrUrl || ""}
+                    id={control.id}
+                    invalid={control["aria-invalid"]}
+                    describedBy={control["aria-describedby"]}
+                    name="paymentQrUrl"
+                    kind="payment-qr"
+                    initialUrl={
+                      state.values?.paymentQrUrl ?? store?.gcashQrUrl ?? ""
+                    }
+                  />
+                )}
+              </Field>
+            </div>
+          )}
+        </section>
         <FormSubmit pending={pending}>
           {store ? "Save store settings" : "Create store"}
         </FormSubmit>

@@ -11,6 +11,7 @@ const weekdays = [
 ] as const;
 const optionalText = (max: number) => z.string().trim().max(max).default("");
 const orderTypeValues = ["DINE_IN", "PICKUP", "DELIVERY"] as const;
+const paymentMethodValues = ["CASH", "GCASH"] as const;
 export const imageUrlSchema = z
   .string()
   .trim()
@@ -75,26 +76,62 @@ export const operatingHoursSchema = z
         });
     }
   });
-export const catalogStoreSettingsSchema = z.object({
-  name: z.string().trim().min(2).max(120),
-  description: optionalText(2000),
-  contactPhone: optionalText(40).refine(
-    (phone) =>
-      !phone ||
-      (/^[+()\d\s.-]+$/.test(phone) && phone.replace(/\D/g, "").length >= 6),
-    "Enter a valid phone number",
-  ),
-  address: optionalText(500),
-  operatingHours: operatingHoursSchema.nullable().default(null),
-  orderTypes: z
-    .array(z.enum(orderTypeValues))
-    .min(1)
-    .refine((values) => new Set(values).size === values.length)
-    .default([...orderTypeValues]),
-  logoUrl: imageUrlSchema,
-  bannerUrl: imageUrlSchema,
-  accentColor: accentColorSchema.default("#244d35"),
-});
+export const catalogStoreSettingsSchema = z
+  .object({
+    name: z.string().trim().min(2).max(120),
+    description: optionalText(2000),
+    contactPhone: optionalText(40).refine(
+      (phone) =>
+        !phone ||
+        (/^[+()\d\s.-]+$/.test(phone) && phone.replace(/\D/g, "").length >= 6),
+      "Enter a valid phone number",
+    ),
+    address: optionalText(500),
+    operatingHours: operatingHoursSchema.nullable().default(null),
+    orderTypes: z
+      .array(z.enum(orderTypeValues))
+      .min(1)
+      .refine((values) => new Set(values).size === values.length)
+      .default([...orderTypeValues]),
+    paymentMethods: z
+      .array(z.enum(paymentMethodValues))
+      .min(1, "Choose at least one payment method")
+      .refine((values) => new Set(values).size === values.length)
+      .default(["CASH"]),
+    gcashAccountName: optionalText(120),
+    gcashNumber: z
+      .string()
+      .trim()
+      .max(40)
+      .refine(
+        (value) =>
+          !value ||
+          (/^[+()\d\s.-]+$/.test(value) &&
+            value.replace(/\D/g, "").length >= 6),
+        "Enter a valid GCash number",
+      )
+      .default(""),
+    gcashQrUrl: imageUrlSchema,
+    logoUrl: imageUrlSchema,
+    bannerUrl: imageUrlSchema,
+    accentColor: accentColorSchema.default("#244d35"),
+  })
+  .superRefine((settings, context) => {
+    if (settings.paymentMethods.includes("GCASH")) {
+      if (!settings.gcashAccountName.trim())
+        context.addIssue({
+          code: "custom",
+          path: ["gcashAccountName"],
+          message: "Enter the GCash account name",
+        });
+      if (!settings.gcashNumber.trim())
+        context.addIssue({
+          code: "custom",
+          path: ["gcashNumber"],
+          message: "Enter the GCash mobile number",
+        });
+    }
+  });
 export const setupStoreSchema = catalogStoreSettingsSchema
   .extend({
     slug: slugSchema,

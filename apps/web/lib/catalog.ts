@@ -20,7 +20,7 @@ export async function ownerApi<T>(path: string, options: RequestInit = {}) {
 }
 export async function uploadCatalogImage(
   file: File,
-  kind: "logo" | "banner" | "product",
+  kind: "logo" | "banner" | "product" | "payment-qr",
 ) {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) redirect("/login");

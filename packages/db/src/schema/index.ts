@@ -27,6 +27,8 @@ export const orderTypeEnum = pgEnum("order_type", [
   "DELIVERY",
   "DINE_IN",
 ]);
+export const paymentMethodEnum = pgEnum("payment_method", ["CASH", "GCASH"]);
+export const paymentStatusEnum = pgEnum("payment_status", ["UNPAID", "PAID"]);
 
 export const users = pgTable("users", {
   id: bigint("id", { mode: "bigint" }).primaryKey().generatedAlwaysAsIdentity(),
@@ -54,6 +56,13 @@ export const stores = pgTable("stores", {
     .$type<Array<"DINE_IN" | "PICKUP" | "DELIVERY">>()
     .notNull()
     .default(["DINE_IN", "PICKUP", "DELIVERY"]),
+  paymentMethods: jsonb("payment_methods")
+    .$type<Array<"CASH" | "GCASH">>()
+    .notNull()
+    .default(["CASH"]),
+  gcashAccountName: varchar("gcash_account_name", { length: 120 }),
+  gcashNumber: varchar("gcash_number", { length: 40 }),
+  gcashQrUrl: text("gcash_qr_url"),
   logoUrl: text("logo_url"),
   bannerUrl: text("banner_url"),
   isActive: boolean("is_active").notNull().default(true),
@@ -137,6 +146,11 @@ export const orders = pgTable("orders", {
   idempotencyKey: varchar("idempotency_key", { length: 36 }).notNull().unique(),
   status: orderStatusEnum("status").notNull().default("NEW"),
   orderType: orderTypeEnum("order_type").notNull().default("PICKUP"),
+  paymentMethod: paymentMethodEnum("payment_method").notNull().default("CASH"),
+  paymentStatus: paymentStatusEnum("payment_status")
+    .notNull()
+    .default("UNPAID"),
+  paymentInstructions: jsonb("payment_instructions"),
   deliveryFee: numeric("delivery_fee", { precision: 10, scale: 2 }),
   total: numeric("total", { precision: 10, scale: 2 }).notNull().default("0"),
   notes: text("notes"),

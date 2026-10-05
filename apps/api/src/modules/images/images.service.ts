@@ -12,7 +12,7 @@ export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 export const imageNamePattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.webp$/;
 export const imagePrefixPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-export type ImageKind = "logo" | "banner" | "product";
+export type ImageKind = "logo" | "banner" | "product" | "payment-qr";
 
 const uploadPrefix = env.OCI_IMAGE_PREFIX ?? env.NODE_ENV;
 
@@ -71,8 +71,8 @@ export async function prepareImage(bytes: Buffer, kind: ImageKind) {
     return await image
       .rotate()
       .resize({
-        width: kind === "logo" ? 512 : kind === "banner" ? 1920 : 1600,
-        height: kind === "logo" ? 512 : kind === "banner" ? 1080 : 1600,
+        width: kind === "banner" ? 1920 : kind === "product" ? 1600 : 1000,
+        height: kind === "banner" ? 1080 : kind === "product" ? 1600 : 1000,
         fit: "inside",
         withoutEnlargement: true,
       })

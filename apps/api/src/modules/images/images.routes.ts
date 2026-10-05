@@ -28,8 +28,13 @@ router.post(
   raw({ type: () => true, limit: MAX_IMAGE_BYTES }),
   async (req, res) => {
     const kind = req.get("x-image-kind");
-    if (kind !== "logo" && kind !== "banner" && kind !== "product")
-      throw new AppError(400, "Choose a logo, banner, or product image");
+    if (
+      kind !== "logo" &&
+      kind !== "banner" &&
+      kind !== "product" &&
+      kind !== "payment-qr"
+    )
+      throw new AppError(400, "Choose a supported image type");
     if (!Buffer.isBuffer(req.body))
       throw new AppError(400, "Choose an image to upload");
     res.status(201).json(await uploadImage(req.body, kind as ImageKind));

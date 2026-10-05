@@ -1,6 +1,6 @@
 # PasaOrder
 
-QR menu ordering and assisted social inbox orders for small businesses. Owner authentication, store setup, catalog editing, and public menus with shareable links and downloadable QR codes are implemented. Checkout, payments, and social integrations are still planned.
+QR menu ordering and assisted social inbox orders for small businesses. Owner authentication, store setup, catalog editing, public menus, guest checkout, and an owner order queue are implemented. Stores can accept Cash and/or GCash with manual owner verification. Social integrations and payment gateway processing remain planned.
 
 ## Local setup
 
@@ -35,7 +35,7 @@ Web: http://localhost:3000. API: http://localhost:4000/api. The dev command buil
 
 After signing in, open **Create store**. Enter your store name; the permanent menu slug is generated from it and can be edited before you create the store. Choose an accent color, add a category and an available item, preview the catalog, then publish it. The workspace provides your public `/menu/[slug]` link and a downloadable PNG QR code for the current site origin.
 
-Drafts stay private. Publishing needs at least one available item; making the last item unavailable automatically unpublishes the catalog. Saved edits to published catalogs go live immediately. Items can have one price or named size/piece options with individual prices. Store logos and product images can be uploaded or linked from public HTTPS URLs. Custom modifiers, carts, checkout, and payments are future work.
+Drafts stay private. Publishing needs at least one available item; making the last item unavailable automatically unpublishes the catalog. Saved edits to published catalogs go live immediately. Items can have one price or named size/piece options with individual prices. Store logos and product images can be uploaded or linked from public HTTPS URLs. Customers choose configured payment methods at checkout; GCash details appear on the confirmation and order tracking page. Owners manually update payment status. Payment gateways and automatic payment confirmation are not implemented.
 
 Image uploads use the OCI S3-compatible Object Storage API from the Express server. Set `OCI_NAMESPACE`, `OCI_REGION`, `OCI_BUCKET_NAME`, `OCI_ACCESS_KEY_ID`, and `OCI_SECRET_ACCESS_KEY` in `apps/api/.env`; keep the bucket private and grant the customer key object read/write access. Uploaded JPG, PNG, and WebP files are limited to 5 MB and normalized to WebP. New objects use separate `images/development/`, `images/production/`, and `images/test/` paths based on API `NODE_ENV`, with matching web URLs under `/api/images/[environment]/[name]`. Set `OCI_IMAGE_PREFIX` to a short custom path such as `staging` for another deployment. Existing uploads at `images/[name]` remain readable through `/api/images/[name]`, and existing HTTPS image URLs continue to work. These prefixes organize objects within one bucket; they do not provide separate bucket permissions. Unused uploaded images are retained for now; object cleanup is future work.
 
@@ -44,6 +44,8 @@ The Orders page subscribes to its selected store through Socket.IO. New orders a
 Migration `0004_yielding_roughhouse.sql` copies ownership from existing businesses to stores before removing the business table. Existing stores and catalogs remain in place. Apply migrations before starting the updated apps.
 
 Migration `0005_charming_stellaris.sql` adds optional product variants without changing existing single-price items.
+
+Migration `0013_worried_william_stryker.sql` adds per-store Cash/GCash settings and per-order payment state plus a snapshot of GCash instructions. Run `pnpm db:migrate` after confirming the existing migration history is already applied to the target database.
 
 ## Structure
 
@@ -83,7 +85,7 @@ docs/               Architecture and implementation roadmap
 | `pnpm db:studio`   | Inspect the configured database                                      |
 | `pnpm db:down`     | Stop local PostgreSQL, preserving its named volume                   |
 
-`pnpm test` uses mocked database queries, not your configured database. They verify authentication, owner scoping, error boundaries, and validation. They do not replace PostgreSQL integration tests for future checkout transactions. `lint` currently covers the frontend; TypeScript checks cover all workspaces.
+`pnpm test` uses mocked database queries, not your configured database. They verify authentication, owner scoping, error boundaries, and validation. They do not replace PostgreSQL integration tests for checkout transactions. `lint` currently covers the frontend; TypeScript checks cover all workspaces.
 
 ## API conventions
 

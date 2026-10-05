@@ -10,6 +10,7 @@ type OrderInput = {
   customerName: string;
   customerPhone?: string;
   orderType: "DINE_IN" | "PICKUP" | "DELIVERY";
+  paymentMethod: "CASH" | "GCASH";
   tableNumber?: string;
   deliveryAddress?: string;
   notes?: string;
@@ -32,7 +33,7 @@ function amount(value: number) {
 
 async function readCreatedOrder(client: PoolClient, trackingToken: string) {
   const order = await client.query(
-    `SELECT id, store_id AS "storeId", status, order_type AS "orderType", table_number AS "tableNumber", delivery_fee AS "deliveryFee", total, tracking_token AS "trackingToken" FROM orders WHERE tracking_token = $1`,
+    `SELECT id, store_id AS "storeId", status, order_type AS "orderType", table_number AS "tableNumber", delivery_fee AS "deliveryFee", total, tracking_token AS "trackingToken", payment_method AS "paymentMethod", payment_status AS "paymentStatus", payment_instructions AS "paymentInstructions" FROM orders WHERE tracking_token = $1`,
     [trackingToken],
   );
   return order.rows[0];
@@ -53,14 +54,31 @@ export async function createPublicOrder(input: OrderInput) {
     const storeResult = await client.query<{
       id: string;
       orderTypes: string[];
+      paymentMethods: string[];
+      gcashAccountName: string | null;
+      gcashNumber: string | null;
+      gcashQrUrl: string | null;
     }>(
-      `SELECT id, order_types AS "orderTypes" FROM stores WHERE slug = $1 AND is_active = true AND is_published = true FOR SHARE`,
+      `SELECT id, order_types AS "orderTypes", payment_methods AS "paymentMethods", gcash_account_name AS "gcashAccountName", gcash_number AS "gcashNumber", gcash_qr_url AS "gcashQrUrl" FROM stores WHERE slug = $1 AND is_active = true AND is_published = true FOR SHARE`,
       [input.storeSlug],
     );
     const store = storeResult.rows[0];
     if (!store) throw new AppError(404, "Menu not found");
     if (!store.orderTypes.includes(input.orderType))
       throw new AppError(400, "This order type is not available at this store");
+    if (!store.paymentMethods.includes(input.paymentMethod))
+      throw new AppError(
+        400,
+        "This payment method is not available at this store",
+      );
+    const paymentInstructions =
+      input.paymentMethod === "GCASH"
+        ? {
+            gcashAccountName: store.gcashAccountName!,
+            gcashNumber: store.gcashNumber!,
+            gcashQrUrl: store.gcashQrUrl,
+          }
+        : null;
 
     const orderItems: {
       productId: string;
@@ -116,7 +134,7 @@ export async function createPublicOrder(input: OrderInput) {
 
     const trackingToken = randomUUID();
     const created = await client.query<{ id: string }>(
-      `INSERT INTO orders (store_id, customer_id, customer_name, customer_phone, delivery_address, order_type, table_number, delivery_fee, total, notes, tracking_token, idempotency_key) VALUES ($1, NULL, $2, $3, $4, $5, $6, NULL, $7, $8, $9, $10) RETURNING id`,
+      `INSERT INTO orders (store_id, customer_id, customer_name, customer_phone, delivery_address, order_type, table_number, payment_method, payment_status, payment_instructions, delivery_fee, total, notes, tracking_token, idempotency_key) VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, 'UNPAID', $8::jsonb, NULL, $9, $10, $11, $12) RETURNING id`,
       [
         store.id,
         input.customerName,
@@ -124,6 +142,8 @@ export async function createPublicOrder(input: OrderInput) {
         input.deliveryAddress || null,
         input.orderType,
         input.orderType === "DINE_IN" ? input.tableNumber || null : null,
+        input.paymentMethod,
+        paymentInstructions ? JSON.stringify(paymentInstructions) : null,
         amount(totalCents),
         input.notes || null,
         trackingToken,
@@ -154,7 +174,7 @@ export async function createPublicOrder(input: OrderInput) {
 
 export async function getPublicOrder(trackingToken: string) {
   const result = await pool.query(
-    `SELECT o.id, o.store_id AS "storeId", s.name AS "storeName", s.slug AS "storeSlug", o.status, o.order_type AS "orderType", o.table_number AS "tableNumber", COALESCE((SELECT SUM(oi.subtotal) FROM order_items oi WHERE oi.order_id = o.id), 0)::text AS "itemsSubtotal", o.total, o.delivery_fee AS "deliveryFee", o.created_at AS "createdAt" FROM orders o JOIN stores s ON s.id = o.store_id WHERE o.tracking_token = $1`,
+    `SELECT o.id, o.store_id AS "storeId", s.name AS "storeName", s.slug AS "storeSlug", o.status, o.order_type AS "orderType", o.table_number AS "tableNumber", o.payment_method AS "paymentMethod", o.payment_status AS "paymentStatus", o.payment_instructions AS "paymentInstructions", COALESCE((SELECT SUM(oi.subtotal) FROM order_items oi WHERE oi.order_id = o.id), 0)::text AS "itemsSubtotal", o.total, o.delivery_fee AS "deliveryFee", o.created_at AS "createdAt" FROM orders o JOIN stores s ON s.id = o.store_id WHERE o.tracking_token = $1`,
     [trackingToken],
   );
   if (!result.rows[0]) throw new AppError(404, "Order not found");
@@ -172,6 +192,13 @@ export async function listOwnerOrders(ownerId: string, storeId?: string) {
     storeName: string;
     status: string;
     orderType: string;
+    paymentMethod: "CASH" | "GCASH";
+    paymentStatus: "UNPAID" | "PAID";
+    paymentInstructions: {
+      gcashAccountName: string;
+      gcashNumber: string;
+      gcashQrUrl: string | null;
+    } | null;
     tableNumber: string | null;
     customerName: string;
     customerPhone: string | null;
@@ -182,7 +209,7 @@ export async function listOwnerOrders(ownerId: string, storeId?: string) {
     notes: string | null;
     createdAt: Date;
   }>(
-    `SELECT o.id, o.store_id AS "storeId", s.name AS "storeName", o.status, o.order_type AS "orderType", o.table_number AS "tableNumber", o.customer_name AS "customerName", o.customer_phone AS "customerPhone", o.delivery_address AS "deliveryAddress", o.delivery_fee AS "deliveryFee", COALESCE(SUM(oi.subtotal), 0)::text AS subtotal, o.total::text AS total, o.notes, o.created_at AS "createdAt" FROM orders o JOIN stores s ON s.id = o.store_id LEFT JOIN order_items oi ON oi.order_id = o.id WHERE s.owner_id = $1 AND ($2::bigint IS NULL OR o.store_id = $2) GROUP BY o.id, s.name ORDER BY CASE o.status WHEN 'NEW' THEN 0 WHEN 'CONFIRMED' THEN 1 WHEN 'PREPARING' THEN 2 WHEN 'READY' THEN 3 ELSE 4 END, CASE WHEN o.status IN ('COMPLETED', 'CANCELLED') THEN o.created_at END DESC, o.created_at ASC LIMIT 300`,
+    `SELECT o.id, o.store_id AS "storeId", s.name AS "storeName", o.status, o.order_type AS "orderType", o.payment_method AS "paymentMethod", o.payment_status AS "paymentStatus", o.table_number AS "tableNumber", o.customer_name AS "customerName", o.customer_phone AS "customerPhone", o.delivery_address AS "deliveryAddress", o.delivery_fee AS "deliveryFee", COALESCE(SUM(oi.subtotal), 0)::text AS subtotal, o.total::text AS total, o.notes, o.created_at AS "createdAt" FROM orders o JOIN stores s ON s.id = o.store_id LEFT JOIN order_items oi ON oi.order_id = o.id WHERE s.owner_id = $1 AND ($2::bigint IS NULL OR o.store_id = $2) GROUP BY o.id, s.name ORDER BY CASE o.status WHEN 'NEW' THEN 0 WHEN 'CONFIRMED' THEN 1 WHEN 'PREPARING' THEN 2 WHEN 'READY' THEN 3 ELSE 4 END, CASE WHEN o.status IN ('COMPLETED', 'CANCELLED') THEN o.created_at END DESC, o.created_at ASC LIMIT 300`,
     [ownerId, storeId ?? null],
   );
   const orders = result.rows;
@@ -212,6 +239,39 @@ export async function listOwnerOrders(ownerId: string, storeId?: string) {
     createdAt: order.createdAt.toISOString(),
     items: itemsByOrder.get(order.id) ?? [],
   }));
+}
+
+export async function updateOwnerOrderPayment(
+  ownerId: string,
+  orderId: string,
+  paymentStatus: "UNPAID" | "PAID",
+) {
+  return transaction(async (client) => {
+    const result = await client.query<{
+      storeId: string;
+      orderType: string;
+      deliveryFee: string | null;
+    }>(
+      `SELECT o.store_id AS "storeId", o.order_type AS "orderType", o.delivery_fee AS "deliveryFee" FROM orders o JOIN stores s ON s.id = o.store_id WHERE o.id = $1 AND s.owner_id = $2 FOR UPDATE OF o`,
+      [orderId, ownerId],
+    );
+    const order = result.rows[0];
+    if (!order) throw new AppError(404, "Order not found");
+    if (
+      paymentStatus === "PAID" &&
+      order.orderType === "DELIVERY" &&
+      order.deliveryFee === null
+    )
+      throw new AppError(
+        409,
+        "Confirm the delivery fee before marking payment as paid",
+      );
+    await client.query(`UPDATE orders SET payment_status = $2 WHERE id = $1`, [
+      orderId,
+      paymentStatus,
+    ]);
+    return { storeId: order.storeId };
+  });
 }
 
 export async function updateOwnerOrder(

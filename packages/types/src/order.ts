@@ -3,6 +3,14 @@ export type OrderStatus =
 
 export const orderTypes = ["DINE_IN", "PICKUP", "DELIVERY"] as const;
 export type OrderType = (typeof orderTypes)[number];
+export const paymentMethods = ["CASH", "GCASH"] as const;
+export type PaymentMethod = (typeof paymentMethods)[number];
+export type PaymentStatus = "UNPAID" | "PAID";
+export type PaymentInstructions = {
+  gcashAccountName: string;
+  gcashNumber: string;
+  gcashQrUrl: string | null;
+};
 
 export type OrderItem = {
   id: string;
@@ -27,6 +35,9 @@ export type Order = {
   trackingToken: string;
   status: OrderStatus;
   orderType: OrderType;
+  paymentMethod: PaymentMethod;
+  paymentStatus: PaymentStatus;
+  paymentInstructions: PaymentInstructions | null;
   deliveryFee: string | null;
   total: string;
   notes: string | null;
@@ -40,6 +51,8 @@ export type OwnerOrder = Pick<
   | "storeId"
   | "status"
   | "orderType"
+  | "paymentMethod"
+  | "paymentStatus"
   | "customerName"
   | "customerPhone"
   | "deliveryAddress"

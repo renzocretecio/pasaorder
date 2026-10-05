@@ -544,6 +544,12 @@ export function MenuView({
         onOpenChange={setCartOpen}
         storeSlug={store.slug}
         storeOrderTypes={store.orderTypes}
+        storePaymentMethods={store.paymentMethods}
+        gcashInstructions={{
+          gcashAccountName: store.gcashAccountName,
+          gcashNumber: store.gcashNumber,
+          gcashQrUrl: store.gcashQrUrl,
+        }}
         accentStyle={style}
         cart={cart}
         setCart={setCart}

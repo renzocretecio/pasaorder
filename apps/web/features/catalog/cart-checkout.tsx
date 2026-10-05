@@ -2,9 +2,16 @@
 
 import { useState, type Dispatch, type SetStateAction } from "react";
 import Link from "next/link";
-import { ArrowLeft, Check, Minus, Plus, ShoppingBag } from "lucide-react";
+import { ArrowLeft, Check, Copy, Minus, Plus, ShoppingBag } from "lucide-react";
 import { Dialog } from "radix-ui";
-import type { OrderType, Product, ProductVariant } from "@pasaorder/types";
+import type {
+  OrderType,
+  PaymentInstructions,
+  PaymentMethod,
+  PaymentStatus,
+  Product,
+  ProductVariant,
+} from "@pasaorder/types";
 import { Button } from "@/components/ui/button";
 import { CatalogImage } from "./catalog-image";
 import { orderTypes } from "@pasaorder/types";
@@ -25,7 +32,108 @@ type PlacedOrder = {
   trackingToken: string;
   deliveryFee: string | null;
   tableNumber: string | null;
+  paymentMethod: PaymentMethod;
+  paymentStatus: PaymentStatus;
+  paymentInstructions: PaymentInstructions | null;
 };
+
+function GcashInstructions({
+  instructions,
+  waitForConfirmation = false,
+  waitForTotal = false,
+  amount,
+}: {
+  instructions: PaymentInstructions;
+  waitForConfirmation?: boolean;
+  waitForTotal?: boolean;
+  amount?: string;
+}) {
+  const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState(false);
+  async function copyDetails() {
+    try {
+      await navigator.clipboard.writeText(instructions.gcashNumber);
+      setCopied(true);
+      setCopyError(false);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+      setCopyError(true);
+    }
+  }
+  return (
+    <div className="rounded-xl border border-[#d6dfd6] bg-white p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold">Send payment to</p>
+          <p className="mt-2 break-words text-sm">
+            {instructions.gcashAccountName}
+          </p>
+          <p className="mt-0.5 text-sm tabular-nums text-[#59685d]">
+            {instructions.gcashNumber}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={copyDetails}
+          className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg border px-3 text-sm font-medium hover:bg-[#f6f8f4] focus-visible:outline-2 focus-visible:outline-[var(--store-accent-ink)]"
+        >
+          <Copy className="size-4" aria-hidden="true" />
+          {copied ? "Copied" : "Copy number"}
+        </button>
+      </div>
+      {!waitForConfirmation && !waitForTotal && amount && (
+        <div className="mt-3 flex justify-between gap-4 border-t border-[#e4e9e2] pt-3 text-sm">
+          <span className="text-[#59685d]">Amount to send</span>
+          <span className="font-semibold tabular-nums">{amount}</span>
+        </div>
+      )}
+      {copyError && (
+        <p role="status" className="mt-2 text-xs text-[#59685d]">
+          Copy wasn’t available. You can select and copy the details above.
+        </p>
+      )}
+      {instructions.gcashQrUrl && (
+        <div className="mt-4 flex items-center gap-4 border-t border-[#e4e9e2] pt-4">
+          <a
+            href={instructions.gcashQrUrl}
+            download="gcash-payment-qr.webp"
+            className="grid size-24 shrink-0 place-items-center rounded-lg border bg-white p-1 focus-visible:outline-2 focus-visible:outline-[var(--store-accent-ink)]"
+            aria-label="Download GCash QR code"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element -- The same stored QR may be OCI-hosted or a merchant HTTPS URL. */}
+            <img
+              src={instructions.gcashQrUrl}
+              alt="GCash payment QR code"
+              className="size-full object-contain"
+            />
+          </a>
+          <div className="text-sm">
+            <p className="font-medium">Or scan the QR code</p>
+            <a
+              href={instructions.gcashQrUrl}
+              download="gcash-payment-qr.webp"
+              className="mt-1 inline-flex min-h-11 items-center font-medium text-[var(--store-accent-ink)] underline underline-offset-4"
+            >
+              Download QR
+            </a>
+          </div>
+        </div>
+      )}
+      {waitForTotal && (
+        <p className="mt-3 border-t border-[#e4e9e2] pt-3 text-xs leading-relaxed text-[#59685d]">
+          Wait for the store to confirm your delivery fee and final total before
+          sending payment.
+        </p>
+      )}
+      {waitForConfirmation && !waitForTotal && (
+        <p className="mt-3 border-t border-[#e4e9e2] pt-3 text-xs leading-relaxed text-[#59685d]">
+          Wait for the store to confirm your order before sending payment.
+        </p>
+      )}
+    </div>
+  );
+}
 
 function orderTypeLabel(orderType: OrderType) {
   if (orderType === "DINE_IN") return "Dine in";
@@ -42,6 +150,8 @@ export function CartCheckout({
   onOpenChange,
   storeSlug,
   storeOrderTypes,
+  storePaymentMethods,
+  gcashInstructions,
   accentStyle,
   cart,
   setCart,
@@ -52,6 +162,14 @@ export function CartCheckout({
   onOpenChange: (open: boolean) => void;
   storeSlug: string;
   storeOrderTypes: OrderType[];
+  storePaymentMethods: PaymentMethod[];
+  gcashInstructions: Omit<
+    PaymentInstructions,
+    "gcashAccountName" | "gcashNumber"
+  > & {
+    gcashAccountName: string | null;
+    gcashNumber: string | null;
+  };
   accentStyle: React.CSSProperties;
   cart: CartLine[];
   setCart: Dispatch<SetStateAction<CartLine[]>>;
@@ -64,6 +182,9 @@ export function CartCheckout({
   const [address, setAddress] = useState("");
   const [tableNumber, setTableNumber] = useState("");
   const [notes, setNotes] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(
+    storePaymentMethods[0] ?? "CASH",
+  );
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const [idempotencyKey, setIdempotencyKey] = useState<string | null>(null);
@@ -121,6 +242,7 @@ export function CartCheckout({
           customerName: name,
           customerPhone: orderType === "DINE_IN" ? undefined : phone,
           orderType,
+          paymentMethod,
           tableNumber:
             orderType === "DINE_IN"
               ? tableNumber.trim() || undefined
@@ -164,7 +286,7 @@ export function CartCheckout({
           className="fixed inset-x-3 top-1/2 z-50 mx-auto flex max-h-[min(44rem,calc(100dvh-1.5rem))] w-[calc(100%-1.5rem)] max-w-lg -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-[#d6dfd6] bg-white text-[#18251d] shadow-xl outline-none"
         >
           {step === "placed" && placedOrder ? (
-            <div className="flex flex-1 flex-col items-center justify-center px-6 py-10 text-center">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-10 text-center">
               <div className="grid size-14 place-items-center rounded-full bg-[var(--store-accent-soft)] text-[var(--store-accent-ink)]">
                 <Check aria-hidden="true" className="size-7" />
               </div>
@@ -178,6 +300,18 @@ export function CartCheckout({
                   ? "."
                   : ` and contact you at ${phone}.`}
               </Dialog.Description>
+              {placedOrder.paymentMethod === "GCASH" &&
+                placedOrder.paymentInstructions && (
+                  <div className="mt-5 w-full text-left">
+                    <p className="mb-2 text-sm font-semibold">GCash payment</p>
+                    <GcashInstructions
+                      instructions={placedOrder.paymentInstructions}
+                      waitForConfirmation={true}
+                      waitForTotal={placedOrder.orderType === "DELIVERY"}
+                      amount={peso(placedOrder.total)}
+                    />
+                  </div>
+                )}
               <div className="mt-6 w-full rounded-xl bg-[#f6f8f4] px-4 py-3 text-left">
                 <div className="flex justify-between gap-4 text-sm">
                   <span className="text-[#59685d]">Order number</span>
@@ -372,13 +506,43 @@ export function CartCheckout({
                     </p>
                   )}
                 </div>
-                <div>
-                  <h3 className="text-sm font-medium">Payment</h3>
-                  <p className="mt-1 text-sm leading-relaxed text-[#59685d]">
-                    The store will confirm payment instructions after reviewing
-                    your order.
-                  </p>
-                </div>
+                <fieldset className="space-y-3">
+                  <legend className="text-sm font-medium">
+                    Payment method
+                  </legend>
+                  <div className="grid grid-cols-2 gap-2">
+                    {storePaymentMethods.map((method) => (
+                      <label
+                        key={method}
+                        className={`flex min-h-12 cursor-pointer items-center gap-2 rounded-xl border px-3 text-sm font-medium ${paymentMethod === method ? "border-[var(--store-accent-ink)] bg-[var(--store-accent-soft)] text-[var(--store-accent-ink)]" : "border-[#d6dfd6]"}`}
+                      >
+                        <input
+                          type="radio"
+                          name="paymentMethod"
+                          value={method}
+                          checked={paymentMethod === method}
+                          onChange={() => setPaymentMethod(method)}
+                          className="accent-[var(--store-accent-ink)]"
+                        />
+                        {method === "CASH" ? "Cash" : "GCash"}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                {paymentMethod === "GCASH" &&
+                  gcashInstructions.gcashAccountName &&
+                  gcashInstructions.gcashNumber && (
+                    <GcashInstructions
+                      instructions={{
+                        gcashAccountName: gcashInstructions.gcashAccountName,
+                        gcashNumber: gcashInstructions.gcashNumber,
+                        gcashQrUrl: gcashInstructions.gcashQrUrl,
+                      }}
+                      waitForConfirmation={true}
+                      waitForTotal={orderType === "DELIVERY"}
+                      amount={subtotal}
+                    />
+                  )}
                 {error && (
                   <p role="alert" className="text-sm text-destructive">
                     {error}

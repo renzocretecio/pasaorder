@@ -15,7 +15,7 @@ import type { OrderStatus, OrderType, OwnerOrder } from "@pasaorder/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { peso } from "@/features/catalog/color";
-import { updateOrderStatus } from "./actions";
+import { updateOrderPayment, updateOrderStatus } from "./actions";
 
 type Queue = "NEW" | "CONFIRMED" | "PREPARING" | "READY" | "HISTORY";
 
@@ -98,8 +98,14 @@ function OrderRow({
   const [retryStatus, setRetryStatus] = useState<OrderStatus | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [paymentPending, startPaymentTransition] = useTransition();
+  const [paymentMessage, setPaymentMessage] = useState("");
   const router = useRouter();
   const action = nextAction(order.status);
+  const deliveryPaymentWaitingForFee =
+    order.paymentStatus === "UNPAID" &&
+    order.orderType === "DELIVERY" &&
+    order.deliveryFee === null;
   const isDeliveryConfirmation =
     order.status === "NEW" && order.orderType === "DELIVERY";
   const feeCents = deliveryFee === "" ? null : cents(Number(deliveryFee));
@@ -127,6 +133,17 @@ function OrderRow({
         setMessage(result.message);
         setRetryStatus(status);
       }
+    });
+  }
+
+  function updatePayment(status: "PAID" | "UNPAID") {
+    setPaymentMessage("");
+    startPaymentTransition(async () => {
+      const result = await updateOrderPayment(order.id, status);
+      if (result.success) {
+        onSuccess(`Order #${order.id} payment marked ${status.toLowerCase()}.`);
+        router.refresh();
+      } else setPaymentMessage(result.message);
     });
   }
 
@@ -232,6 +249,48 @@ function OrderRow({
         </div>
 
         <div className="flex min-w-0 flex-col justify-end gap-3 border-t border-border pt-3 md:border-t-0 md:pt-0">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-muted/50 px-3 py-2.5">
+            <div className="min-w-0 text-sm">
+              <p className="font-medium">
+                {order.paymentMethod === "GCASH" ? "GCash" : "Cash"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {order.paymentStatus === "PAID"
+                  ? "Paid"
+                  : "Payment not verified"}
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant={order.paymentStatus === "PAID" ? "outline" : "secondary"}
+              size="sm"
+              disabled={paymentPending || deliveryPaymentWaitingForFee}
+              onClick={() =>
+                updatePayment(
+                  order.paymentStatus === "PAID" ? "UNPAID" : "PAID",
+                )
+              }
+              className="min-h-10 rounded-lg"
+            >
+              {paymentPending
+                ? "Updating…"
+                : deliveryPaymentWaitingForFee
+                  ? "Confirm fee first"
+                  : order.paymentStatus === "PAID"
+                    ? "Undo paid"
+                    : "Mark as paid"}
+            </Button>
+          </div>
+          {deliveryPaymentWaitingForFee && (
+            <p className="text-xs text-muted-foreground">
+              Confirm the delivery fee before marking this order paid.
+            </p>
+          )}
+          {paymentMessage && (
+            <p role="alert" className="text-sm text-destructive">
+              {paymentMessage}
+            </p>
+          )}
           {order.orderType === "DELIVERY" && (
             <div className="flex items-center justify-between gap-4 text-sm">
               <span className="text-muted-foreground">Delivery fee</span>

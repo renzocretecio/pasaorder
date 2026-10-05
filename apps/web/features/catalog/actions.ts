@@ -82,20 +82,26 @@ async function mutateCatalog(
           key !== "imageFile" &&
           key !== "logoFile" &&
           key !== "bannerFile" &&
+          key !== "paymentQrFile" &&
           !key.startsWith("$ACTION_") &&
           !key.startsWith("_"),
       )
       .map(([key, value]) => [key, String(value)]),
   );
   const imageFields: {
-    field: "logoUrl" | "bannerUrl" | "imageUrl";
+    field: "logoUrl" | "bannerUrl" | "imageUrl" | "paymentQrUrl";
     input: string;
-    kind: "logo" | "banner" | "product";
+    kind: "logo" | "banner" | "product" | "payment-qr";
   }[] =
     operation === "setup" || operation === "settings"
       ? [
           { field: "logoUrl", input: "logoFile", kind: "logo" },
           { field: "bannerUrl", input: "bannerFile", kind: "banner" },
+          {
+            field: "paymentQrUrl",
+            input: "paymentQrFile",
+            kind: "payment-qr",
+          },
         ]
       : operation === "item"
         ? [{ field: "imageUrl", input: "imageFile", kind: "product" }]
@@ -105,6 +111,16 @@ async function mutateCatalog(
     kind: (typeof imageFields)[number]["kind"];
     file: File;
   }[] = [];
+  const submittedPaymentMethods = (["CASH", "GCASH"] as const).filter(
+    (method) => values[`paymentMethod_${method}`] === "on",
+  );
+  if (submittedPaymentMethods.includes("GCASH")) {
+    imageFields.push({
+      field: "paymentQrUrl",
+      input: "paymentQrFile",
+      kind: "payment-qr",
+    });
+  }
   for (const image of imageFields) {
     const entry = data.get(image.input);
     if (entry && !(entry instanceof File))
@@ -143,6 +159,18 @@ async function mutateCatalog(
     orderTypes: orderTypes.filter(
       (orderType) => values[`orderType_${orderType}`] === "on",
     ),
+    paymentMethods: submittedPaymentMethods,
+    gcashAccountName: submittedPaymentMethods.includes("GCASH")
+      ? (values.gcashAccountName ?? "")
+      : "",
+    gcashNumber: submittedPaymentMethods.includes("GCASH")
+      ? (values.gcashNumber ?? "")
+      : "",
+    gcashQrUrl:
+      !submittedPaymentMethods.includes("GCASH") ||
+      selectedImages.some((image) => image.field === "paymentQrUrl")
+        ? ""
+        : (values.paymentQrUrl ?? ""),
     logoUrl: selectedImages.some((image) => image.field === "logoUrl")
       ? ""
       : (values.logoUrl ?? ""),
@@ -213,6 +241,8 @@ async function mutateCatalog(
           parsed.data.bannerUrl = url;
         if (image.field === "imageUrl" && "imageUrl" in parsed.data)
           parsed.data.imageUrl = url;
+        if (image.field === "paymentQrUrl" && "paymentQrUrl" in parsed.data)
+          parsed.data.paymentQrUrl = url;
       } catch (error) {
         return {
           errors: {

@@ -1,5 +1,5 @@
 import type { Product } from "./product.js";
-import type { OrderType } from "./order.js";
+import type { OrderType, PaymentMethod } from "./order.js";
 export const weekdays = [
   "monday",
   "tuesday",
@@ -25,6 +25,10 @@ export type CatalogStore = {
   address: string | null;
   operatingHours: OperatingHours | null;
   orderTypes: OrderType[];
+  paymentMethods: PaymentMethod[];
+  gcashAccountName: string | null;
+  gcashNumber: string | null;
+  gcashQrUrl: string | null;
   logoUrl: string | null;
   bannerUrl: string | null;
   isActive: boolean;

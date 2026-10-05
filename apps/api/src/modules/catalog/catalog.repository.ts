@@ -9,7 +9,7 @@ import type {
 } from "@pasaorder/types";
 import { pool } from "../../db.js";
 import { AppError } from "../../middleware/errors.js";
-const storeFields = `s.id, s.name, s.slug, s.description, s.contact_phone AS "contactPhone", s.address, s.operating_hours AS "operatingHours", s.order_types AS "orderTypes", s.logo_url AS "logoUrl", s.banner_url AS "bannerUrl", s.is_active AS "isActive", s.is_published AS "isPublished", s.accent_color AS "accentColor"`;
+const storeFields = `s.id, s.name, s.slug, s.description, s.contact_phone AS "contactPhone", s.address, s.operating_hours AS "operatingHours", s.order_types AS "orderTypes", s.payment_methods AS "paymentMethods", s.gcash_account_name AS "gcashAccountName", s.gcash_number AS "gcashNumber", s.gcash_qr_url AS "gcashQrUrl", s.logo_url AS "logoUrl", s.banner_url AS "bannerUrl", s.is_active AS "isActive", s.is_published AS "isPublished", s.accent_color AS "accentColor"`;
 export async function transaction<T>(work: (client: PoolClient) => Promise<T>) {
   const client = await pool.connect();
   try {
@@ -99,6 +99,10 @@ export type StoreInput = {
   address: string;
   operatingHours: CatalogStore["operatingHours"];
   orderTypes: CatalogStore["orderTypes"];
+  paymentMethods: CatalogStore["paymentMethods"];
+  gcashAccountName: string;
+  gcashNumber: string;
+  gcashQrUrl: string;
   logoUrl: string;
   bannerUrl: string;
   accentColor: string;
@@ -110,7 +114,7 @@ export async function setupStore(
   ownerId: string,
 ) {
   const store = await pool.query<{ id: string }>(
-    `WITH new_store AS (INSERT INTO stores (owner_id, name, slug, description, logo_url, accent_color, contact_phone, address, operating_hours, order_types, banner_url, is_published) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11,false) RETURNING id), default_preference AS (INSERT INTO owner_preferences (owner_id, default_store_id) SELECT $1, id FROM new_store ON CONFLICT (owner_id) DO NOTHING RETURNING owner_id) SELECT id FROM new_store`,
+    `WITH new_store AS (INSERT INTO stores (owner_id, name, slug, description, logo_url, accent_color, contact_phone, address, operating_hours, order_types, banner_url, payment_methods, gcash_account_name, gcash_number, gcash_qr_url, is_published) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11,$12::jsonb,$13,$14,$15,false) RETURNING id), default_preference AS (INSERT INTO owner_preferences (owner_id, default_store_id) SELECT $1, id FROM new_store ON CONFLICT (owner_id) DO NOTHING RETURNING owner_id) SELECT id FROM new_store`,
     [
       ownerId,
       input.name,
@@ -123,6 +127,10 @@ export async function setupStore(
       input.operatingHours ? JSON.stringify(input.operatingHours) : null,
       JSON.stringify(input.orderTypes),
       input.bannerUrl || null,
+      JSON.stringify(input.paymentMethods),
+      input.paymentMethods.includes("GCASH") ? input.gcashAccountName : null,
+      input.paymentMethods.includes("GCASH") ? input.gcashNumber : null,
+      input.paymentMethods.includes("GCASH") ? input.gcashQrUrl || null : null,
     ],
   );
   return { id: store.rows[0].id };
@@ -139,7 +147,7 @@ export async function settings(id: string, input: StoreInput, ownerId: string) {
   return transaction(async (client) => {
     await ownedStore(client, id, ownerId);
     await client.query(
-      "UPDATE stores SET name=$2, description=$3, logo_url=$4, accent_color=$5, contact_phone=$6, address=$7, operating_hours=$8::jsonb, banner_url=$9, order_types=$10::jsonb WHERE id=$1",
+      "UPDATE stores SET name=$2, description=$3, logo_url=$4, accent_color=$5, contact_phone=$6, address=$7, operating_hours=$8::jsonb, banner_url=$9, order_types=$10::jsonb, payment_methods=$11::jsonb, gcash_account_name=$12, gcash_number=$13, gcash_qr_url=$14 WHERE id=$1",
       [
         id,
         input.name,
@@ -151,6 +159,12 @@ export async function settings(id: string, input: StoreInput, ownerId: string) {
         input.operatingHours ? JSON.stringify(input.operatingHours) : null,
         input.bannerUrl || null,
         JSON.stringify(input.orderTypes),
+        JSON.stringify(input.paymentMethods),
+        input.paymentMethods.includes("GCASH") ? input.gcashAccountName : null,
+        input.paymentMethods.includes("GCASH") ? input.gcashNumber : null,
+        input.paymentMethods.includes("GCASH")
+          ? input.gcashQrUrl || null
+          : null,
       ],
     );
   });

@@ -2,6 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ApiError, authApi } from "@/lib/auth";
 import { peso } from "@/features/catalog/color";
+import type {
+  PaymentInstructions,
+  PaymentMethod,
+  PaymentStatus,
+} from "@pasaorder/types";
+import { CopyPaymentDetails } from "@/features/catalog/copy-payment-details";
 
 type TrackedOrder = {
   id: string;
@@ -14,6 +20,9 @@ type TrackedOrder = {
   itemsSubtotal: string;
   total: string;
   deliveryFee: string | null;
+  paymentMethod: PaymentMethod;
+  paymentStatus: PaymentStatus;
+  paymentInstructions: PaymentInstructions | null;
   createdAt: string;
   items: {
     productName: string;
@@ -130,6 +139,105 @@ export default async function OrderTrackingPage({
               </div>
             </div>
           )}
+        </section>
+
+        <section
+          aria-labelledby="payment-heading"
+          className="border-t border-[#d6dfd6] py-5"
+        >
+          <div className="flex items-center justify-between gap-4">
+            <h2 id="payment-heading" className="text-base font-semibold">
+              Payment
+            </h2>
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-medium ${order.paymentStatus === "PAID" ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-900"}`}
+            >
+              {order.paymentStatus === "PAID"
+                ? "Paid"
+                : order.paymentMethod === "GCASH"
+                  ? "Awaiting verification"
+                  : "Unpaid"}
+            </span>
+          </div>
+          <p className="mt-2 text-sm text-[#59685d]">
+            {order.paymentMethod === "GCASH" ? "GCash" : "Cash"}
+            {order.paymentMethod === "CASH" ? " · Pay the store in cash." : ""}
+          </p>
+          {order.paymentMethod === "GCASH" &&
+            order.paymentStatus !== "PAID" &&
+            order.status !== "CANCELLED" &&
+            order.paymentInstructions && (
+              <div className="mt-4 rounded-xl border border-[#d6dfd6] bg-white p-4">
+                <p className="text-sm font-semibold">Send GCash payment to</p>
+                <p className="mt-2 text-sm">
+                  {order.paymentInstructions.gcashAccountName}
+                </p>
+                <p className="mt-0.5 text-sm tabular-nums text-[#59685d]">
+                  {order.paymentInstructions.gcashNumber}
+                </p>
+                {order.status !== "NEW" &&
+                  !(
+                    order.orderType === "DELIVERY" && order.deliveryFee === null
+                  ) && (
+                    <div className="mt-3 flex justify-between gap-4 border-t border-[#e4e9e2] pt-3 text-sm">
+                      <span className="text-[#59685d]">Amount to send</span>
+                      <span className="font-semibold tabular-nums">
+                        {peso(
+                          order.orderType === "DELIVERY"
+                            ? order.total
+                            : order.itemsSubtotal,
+                        )}
+                      </span>
+                    </div>
+                  )}
+                <CopyPaymentDetails
+                  accountNumber={order.paymentInstructions.gcashNumber}
+                />
+                {order.paymentInstructions.gcashQrUrl && (
+                  <div className="mt-4 flex items-center gap-4 border-t border-[#e4e9e2] pt-4">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- Merchant QR can be stored in OCI or linked by HTTPS. */}
+                    <img
+                      src={order.paymentInstructions.gcashQrUrl}
+                      alt="GCash payment QR code"
+                      className="size-28 rounded-lg border object-contain"
+                    />
+                    <a
+                      href={order.paymentInstructions.gcashQrUrl}
+                      download="gcash-payment-qr.webp"
+                      className="inline-flex min-h-11 items-center font-medium text-[#244d35] underline underline-offset-4"
+                    >
+                      Download QR
+                    </a>
+                  </div>
+                )}
+                {(order.status === "NEW" ||
+                  (order.orderType === "DELIVERY" &&
+                    order.deliveryFee === null)) && (
+                  <p className="mt-3 border-t border-[#e4e9e2] pt-3 text-xs leading-relaxed text-[#59685d]">
+                    {order.orderType === "DELIVERY" &&
+                    order.deliveryFee === null
+                      ? "Wait for the store to confirm your order, delivery fee, and final total before sending payment."
+                      : "Wait for the store to confirm your order before sending payment."}
+                  </p>
+                )}
+              </div>
+            )}
+          {order.paymentMethod === "GCASH" &&
+            order.paymentStatus === "UNPAID" &&
+            order.status !== "CANCELLED" && (
+              <p className="mt-3 text-xs leading-relaxed text-[#59685d]">
+                After sending payment, the store will verify it and update this
+                order.
+              </p>
+            )}
+          {order.paymentMethod === "GCASH" &&
+            order.paymentStatus === "UNPAID" &&
+            order.status === "CANCELLED" && (
+              <p className="mt-3 text-sm leading-relaxed text-[#59685d]">
+                This order was cancelled. Contact the store if you already sent
+                payment.
+              </p>
+            )}
         </section>
 
         <p className="border-t border-[#d6dfd6] pt-4 text-sm leading-relaxed text-[#59685d]">

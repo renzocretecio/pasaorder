@@ -19,6 +19,7 @@ export const createOrderSchema = z
       .regex(/^[+()\d\s.-]+$/)
       .optional(),
     orderType: z.enum(["DINE_IN", "PICKUP", "DELIVERY"]),
+    paymentMethod: z.enum(["CASH", "GCASH"]),
     tableNumber: z.string().trim().max(40).optional(),
     deliveryAddress: z.string().trim().max(500).optional(),
     notes: z.string().trim().max(500).optional(),
@@ -74,4 +75,8 @@ export const updateOrderStatusSchema = z
       .regex(/^(?:0|[1-9]\d{0,7})(?:\.\d{1,2})?$/)
       .optional(),
   })
+  .strict();
+
+export const updatePaymentStatusSchema = z
+  .object({ status: z.enum(["UNPAID", "PAID"]) })
   .strict();
