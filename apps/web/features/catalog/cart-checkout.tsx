@@ -240,7 +240,8 @@ export function CartCheckout({
           storeSlug,
           idempotencyKey: requestKey,
           customerName: name,
-          customerPhone: orderType === "DINE_IN" ? undefined : phone,
+          customerPhone:
+            orderType === "DINE_IN" ? undefined : phone.trim() || undefined,
           orderType,
           paymentMethod,
           tableNumber:
@@ -408,14 +409,16 @@ export function CartCheckout({
                       htmlFor="checkout-phone"
                       className="mb-1.5 block text-sm font-medium"
                     >
-                      Mobile number
+                      Mobile number{" "}
+                      <span className="font-normal text-[#59685d]">
+                        (optional)
+                      </span>
                     </label>
                     <input
                       id="checkout-phone"
                       name="phone"
                       type="tel"
                       autoComplete="tel"
-                      required
                       minLength={6}
                       maxLength={40}
                       value={phone}

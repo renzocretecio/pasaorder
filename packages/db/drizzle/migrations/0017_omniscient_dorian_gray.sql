@@ -1,0 +1,1 @@
+ALTER TABLE "chat_order_drafts" ADD COLUMN "initial_decision" jsonb;

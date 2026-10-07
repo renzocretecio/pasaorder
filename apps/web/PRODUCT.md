@@ -10,7 +10,8 @@ web
 
 - Store owners and staff who maintain a menu or catalog, receive orders, and track their progress. The initial audience is any store with a menu or catalog, rather than one food-service niche.
 - Customers who open a store's menu from a QR code or shared link and place an order in a mobile browser.
-- Premium store users who review order drafts extracted from Facebook Messenger or Instagram conversations.
+- Store owners who review customer chat conversations and use Clef-flash cues and Gemini extraction to prepare order drafts. Facebook Messenger Page connections deliver incoming text messages, look up the customer's profile name when Meta makes it available, and let owners reply from PasaOrder; Instagram remains planned.
+- Customers testing the public store chat can enter a name and send messages that appear as an owner-reviewed draft. Replies from the public test chat and automatic AI replies are not available yet.
 
 ## Product Purpose
 
@@ -18,7 +19,7 @@ PasaOrder helps a store publish a menu, receive customer orders, and manage them
 
 ## Positioning
 
-The product connects a store's public QR/link ordering flow with its order workspace. The planned premium capability turns Messenger and Instagram conversations into structured, trackable order drafts within that same workflow. The owner reviews and confirms an AI-created draft before it becomes an order.
+The product connects a store's public QR/link ordering flow with its order workspace. Owners can review public test chat and Facebook Messenger conversations in an inbox organized by the current conversation state, use Clef-flash routing and automatic Gemini extraction for clear order candidates, reply to Messenger customers, review an editable order draft against the store catalog, and confirm it into the same order queue. Instagram remains planned.
 
 ## Operating Context
 
@@ -28,13 +29,14 @@ The product connects a store's public QR/link ordering flow with its order works
 
 ## Capabilities and Constraints
 
-- Owner authentication, store setup, contact phone, address, weekly operating hours, store banners, configurable dine-in/to-go/delivery options, category and item editing, optional size/piece variants with individual prices, image uploads, availability, accent customization, private preview, catalog publishing, public menu links, and downloadable menu QR codes exist. Guest checkout and a basic owner order queue with status updates exist. Stores can enable Cash and/or GCash, add copyable GCash account details and an optional QR image, and customers choose a method at checkout. Orders snapshot GCash instructions and track payment status independently; owners manually mark payment paid or unpaid. For delivery, the store sets the fee per order when confirming it. Automatic payment confirmation, payment gateways, and Meta integrations remain planned.
+- Owner authentication, store setup, contact phone, address, weekly operating hours, store banners, configurable dine-in/to-go/delivery options, category and item editing, optional size/piece variants with individual prices, image uploads, availability, accent customization, private preview, catalog publishing, public menu links, and downloadable menu QR codes exist. Guest checkout and a basic owner order queue with status updates exist. Stores can enable Cash and/or GCash, add copyable GCash account details and an optional QR image, and customers choose a method at checkout. Orders snapshot GCash instructions and track payment status independently; owners manually mark payment paid or unpaid. For delivery, the store sets the fee per order when confirming it. Facebook Messenger supports per-store Page connections, verified inbound text webhooks, best-effort customer profile name lookup, and owner-initiated text replies through Meta. Instagram, automatic payment confirmation, and payment gateways remain planned.
 - Store logos, banners, and product images can be uploaded to OCI Object Storage or supplied by public HTTPS URL. Uploaded images are normalized to WebP and served through the app; custom modifiers remain planned. Drafts and inactive stores are not public; publishing requires an available item. Saved edits to published catalogs go live immediately. Making the last item unavailable unpublishes the catalog.
 - Each store belongs directly to an owner, with categories, products, and orders attached to stores.
 - Public menu ordering is intended to work without requiring a customer account.
 - Pickup, delivery, and dine-in are the selected first-release order types.
 - GCash copyable details and an optional downloadable QR are manual payment instructions. Store owners verify payment from their GCash account and update the order; automatic payment confirmation or a payment gateway has not been decided.
-- Premium chat extraction creates an editable draft for owner review and confirmation. The choice of Jev or Laya and the LLM provider remains open.
+- The owner chat inbox shows All, Possible order, and Needs attention. Harmless greetings and thanks can remain in All without appearing in an actionable filter. Clef reads the conversation and stores nine intents internally, but the owner sees only the operational queue and next action. Only a clear order with enough detail enters Possible order. Opening a chat starts review automatically. When new-order intent has a distinct lead, Gemini Flash-Lite can add clearly requested items to an editable form even if the chat remains in Needs attention. Tentative, unavailable, and ambiguous items remain listed for owner review. Other requests show guidance and available store facts. Product, store, and payment inquiries show owner-facing facts from catalog/settings data. Modification, cancellation, and status requests stay with the owner because chat identity is not linked to a verified order. PasaOrder matches only unique available catalog items and options; unresolved requests remain visible for manual review. AI review sends chat text to Cloudflare and/or Google when configured; provider failure leaves the manual flow usable. Confirmation re-reads availability and prices from the database and closes the chat draft. Automatic AI replies and post-order follow-ups remain planned.
+- A public `/chat/[store-slug]` test route asks for a customer name, then stores customer messages as a Web chat draft in the same review workflow. The customer can resume in the same browser tab while the draft remains open. It does not send a store reply or create an order automatically. Owners refresh messages before review, and confirmation rejects a stale transcript.
 - Customer research, subscription terms, and pricing have not been established.
 
 ## Brand Commitments

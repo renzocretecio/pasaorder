@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { ChevronDown, Plus, ShoppingBag, Store } from "lucide-react";
+import {
+  ChevronDown,
+  MessageSquareText,
+  Plus,
+  ShoppingBag,
+  Store,
+} from "lucide-react";
 import type { WorkspaceStore } from "@pasaorder/types";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { cn } from "@/lib/utils";
@@ -26,6 +32,7 @@ export function WorkspaceNavigation({
   const [pending, startTransition] = useTransition();
   const creating = pathname === "/dashboard/new";
   const orders = pathname.endsWith("/orders");
+  const chatOrders = pathname.includes("/chat-orders");
   const routeStoreId = pathname.match(/^\/dashboard\/stores\/([^/]+)/)?.[1];
   const selectedStore =
     stores.find((store) => store.id === routeStoreId) ??
@@ -76,13 +83,19 @@ export function WorkspaceNavigation({
       href: catalogHref,
       label: "Catalog",
       icon: Store,
-      active: Boolean(selectedStore) && !creating && !orders,
+      active: Boolean(selectedStore) && !creating && !orders && !chatOrders,
     },
     {
       href: ordersHref,
       label: "Orders",
       icon: ShoppingBag,
       active: Boolean(selectedStore) && orders,
+    },
+    {
+      href: selectedStore ? `${catalogHref}/chat-orders` : "/dashboard",
+      label: "Chats",
+      icon: MessageSquareText,
+      active: Boolean(selectedStore) && chatOrders,
     },
   ];
 
@@ -104,7 +117,7 @@ export function WorkspaceNavigation({
             PasaOrder
           </span>
         </Link>
-        <p className="mt-10 mb-3 hidden px-3 text-[11px] font-medium tracking-[.1em] text-muted-foreground uppercase xl:block">
+        <p className="mt-10 mb-3 hidden px-3 text-xs font-medium tracking-[.1em] text-muted-foreground uppercase xl:block">
           {selectedStore?.name ?? "Workspace"}
         </p>
         <nav aria-label="Store workspace" className="mt-8 space-y-2 xl:mt-0">
@@ -246,7 +259,7 @@ export function WorkspaceNavigation({
       </header>
       <nav
         aria-label="Store workspace"
-        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-2 border-t bg-card pt-2 pl-[max(1.25rem,env(safe-area-inset-left))] pr-[max(1.25rem,env(safe-area-inset-right))] pb-[max(.5rem,env(safe-area-inset-bottom))] md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-3 border-t bg-card pt-2 pl-[max(1.25rem,env(safe-area-inset-left))] pr-[max(1.25rem,env(safe-area-inset-right))] pb-[max(.5rem,env(safe-area-inset-bottom))] md:hidden"
       >
         {links.map(({ href, label, icon: Icon, active }) => (
           <Link

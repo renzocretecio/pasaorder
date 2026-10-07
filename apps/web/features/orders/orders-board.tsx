@@ -18,6 +18,7 @@ import { peso } from "@/features/catalog/color";
 import { updateOrderPayment, updateOrderStatus } from "./actions";
 
 type Queue = "NEW" | "CONFIRMED" | "PREPARING" | "READY" | "HISTORY";
+type PaymentFilter = "ALL" | "UNPAID";
 
 const queues: { id: Queue; label: string }[] = [
   { id: "NEW", label: "New" },
@@ -158,6 +159,15 @@ function OrderRow({
             <Badge variant="outline" className={statusStyle[order.status]}>
               {statusLabel[order.status]}
             </Badge>
+            {order.source !== "MENU" && (
+              <Badge variant="outline" className="border-border bg-muted/50">
+                {order.source === "MESSENGER"
+                  ? "Messenger"
+                  : order.source === "INSTAGRAM"
+                    ? "Instagram"
+                    : "Web chat"}
+              </Badge>
+            )}
             {nextActionLabel && (
               <Badge variant="secondary" className="font-medium">
                 {nextActionLabel}
@@ -476,6 +486,7 @@ export function OrdersBoard({
   storeId: string;
 }) {
   const [queue, setQueue] = useState<Queue>("NEW");
+  const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("ALL");
   const [announcement, setAnnouncement] = useState("");
   const [liveStatus, setLiveStatus] = useState<
     "connecting" | "live" | "reconnecting"
@@ -539,7 +550,7 @@ export function OrdersBoard({
     }
   }, [loadedAt]);
 
-  const visibleOrders = useMemo(
+  const queueOrders = useMemo(
     () =>
       orders.filter((order) => {
         const matchesQueue =
@@ -549,6 +560,18 @@ export function OrdersBoard({
         return matchesQueue;
       }),
     [orders, queue],
+  );
+  const unpaidCount = useMemo(
+    () =>
+      queueOrders.filter((order) => order.paymentStatus === "UNPAID").length,
+    [queueOrders],
+  );
+  const visibleOrders = useMemo(
+    () =>
+      paymentFilter === "UNPAID"
+        ? queueOrders.filter((order) => order.paymentStatus === "UNPAID")
+        : queueOrders,
+    [paymentFilter, queueOrders],
   );
   const counts = useMemo(
     () =>
@@ -642,6 +665,44 @@ export function OrdersBoard({
         </div>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2 py-3">
+        <span className="mr-1 text-xs font-medium text-muted-foreground">
+          Payment
+        </span>
+        <div
+          role="group"
+          aria-label="Filter orders by payment status"
+          className="flex flex-wrap gap-1"
+        >
+          <button
+            type="button"
+            aria-pressed={paymentFilter === "ALL"}
+            onClick={() => {
+              setPaymentFilter("ALL");
+              setAnnouncement("Showing all payment statuses in this queue.");
+            }}
+            className={`flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-ring ${paymentFilter === "ALL" ? "bg-secondary text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+          >
+            All payments
+            <span className="tabular-nums">{queueOrders.length}</span>
+          </button>
+          <button
+            type="button"
+            aria-pressed={paymentFilter === "UNPAID"}
+            onClick={() => {
+              setPaymentFilter("UNPAID");
+              setAnnouncement(
+                `Showing ${unpaidCount} unpaid ${queues.find((item) => item.id === queue)?.label.toLowerCase()} ${unpaidCount === 1 ? "order" : "orders"}.`,
+              );
+            }}
+            className={`flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-ring ${paymentFilter === "UNPAID" ? "bg-secondary text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+          >
+            Unpaid
+            <span className="tabular-nums">{unpaidCount}</span>
+          </button>
+        </div>
+      </div>
+
       <p className="sr-only" role="status" aria-live="polite">
         {announcement}
       </p>
@@ -664,16 +725,20 @@ export function OrdersBoard({
             aria-hidden="true"
           />
           <h2 className="mt-4 text-base font-semibold">
-            {orders.length === 0
-              ? "No orders yet"
-              : `No ${queues.find((item) => item.id === queue)?.label.toLowerCase()} orders`}
+            {paymentFilter === "UNPAID" && queueOrders.length > 0
+              ? "No unpaid orders"
+              : orders.length === 0
+                ? "No orders yet"
+                : `No ${queues.find((item) => item.id === queue)?.label.toLowerCase()} orders`}
           </h2>
           <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
-            {orders.length === 0
-              ? "Orders placed through your published menus will appear here."
-              : queue === "NEW"
-                ? "New orders will appear here when customers place them. Refresh to check for new orders."
-                : "There are no orders in this queue right now."}
+            {paymentFilter === "UNPAID" && queueOrders.length > 0
+              ? "All orders in this queue are marked paid."
+              : orders.length === 0
+                ? "Orders placed through your published menus will appear here."
+                : queue === "NEW"
+                  ? "New orders will appear here when customers place them. Refresh to check for new orders."
+                  : "There are no orders in this queue right now."}
           </p>
         </div>
       )}

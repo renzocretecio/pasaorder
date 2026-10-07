@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import { createHash, randomUUID } from "node:crypto";
 import { after, before, test } from "node:test";
 import type { Server } from "node:http";
 import jwt from "jsonwebtoken";
 import sharp from "sharp";
+import type { Catalog } from "@pasaorder/types";
 import {
   setupStoreSchema,
   catalogStoreSettingsSchema,
@@ -12,17 +14,37 @@ import {
   imageUrlSchema,
   idSchema,
   registerSchema,
+  createChatOrderDraftSchema,
+  confirmChatOrderDraftSchema,
 } from "@pasaorder/validation";
 
 process.env.NODE_ENV = "test";
+process.env.DOTENV_CONFIG_PATH = "/dev/null";
 process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test";
 process.env.JWT_SECRET = "test-secret-only-for-tests-32-characters";
 process.env.WEB_ORIGIN = "http://localhost:3000";
+delete process.env.CLOUDFLARE_AI_ACCOUNT_ID;
+delete process.env.CLOUDFLARE_AI_API_TOKEN;
+delete process.env.GEMINI_API_KEY;
 const { default: app } = await import("../src/app.js");
 const { pool } = await import("../src/db.js");
 const { signToken } = await import("../src/middleware/auth.js");
 const { prepareImage } =
   await import("../src/modules/images/images.service.js");
+const { parseClefResponse } =
+  await import("../src/modules/orders/clef.service.js");
+const {
+  canExtractOrderCandidate,
+  chatInboxBucket,
+  intentDecisionLog,
+  routeChatDecision,
+} = await import("../src/modules/orders/decision-router.js");
+const { listChatOrderDrafts, savePublicChatDecision } =
+  await import("../src/modules/orders/orders.repository.js");
+const { inquiryContext } =
+  await import("../src/modules/orders/inquiry-context.js");
+const { parseGeminiResponse, reviewExtraction } =
+  await import("../src/modules/orders/gemini.service.js");
 const originalQuery = (async (sql: string, params: unknown[]) => {
   if (sql.startsWith("SELECT token_version"))
     return { rows: [{ tokenVersion: 0 }] };
@@ -73,6 +95,625 @@ test("management routes and current user reject unauthenticated callers", async 
       ).status,
       401,
     );
+  }
+});
+test("chat order draft routes require an authenticated owner", async () => {
+  const routes: [string, string][] = [
+    ["GET", "/orders/stores/1/chat-drafts"],
+    ["POST", "/orders/stores/1/chat-drafts"],
+    ["GET", "/orders/chat-drafts/1"],
+    ["PATCH", "/orders/chat-drafts/1"],
+    ["DELETE", "/orders/chat-drafts/1"],
+    ["POST", "/orders/chat-drafts/1/prepare"],
+    ["POST", "/orders/chat-drafts/1/confirm"],
+  ];
+  for (const [method, route] of routes) {
+    const response = await fetch(`${base}${route}`, {
+      method,
+      headers: { "content-type": "application/json" },
+      body: ["POST", "PATCH"].includes(method) ? "{}" : undefined,
+    });
+    assert.equal(response.status, 401, `${method} ${route}`);
+  }
+});
+test("Gemini order extraction matches only exact available catalog items", () => {
+  const extracted = parseGeminiResponse({
+    steps: [
+      {
+        type: "model_output",
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              customerName: null,
+              customerPhone: null,
+              orderType: "PICKUP",
+              tableNumber: null,
+              deliveryAddress: null,
+              paymentMethod: "UNSPECIFIED",
+              requestedTime: "7:00 PM",
+              notes: null,
+              items: [
+                {
+                  name: "Cheeseburger",
+                  option: null,
+                  quantity: 2,
+                  confirmed: true,
+                  specialInstructions: null,
+                },
+                {
+                  name: "Fries",
+                  option: "XL",
+                  quantity: 1,
+                  confirmed: true,
+                  specialInstructions: null,
+                },
+                {
+                  name: "Coke",
+                  option: null,
+                  quantity: 1,
+                  confirmed: false,
+                  specialInstructions: null,
+                },
+                {
+                  name: "Chicken Burger",
+                  option: null,
+                  quantity: 1,
+                  confirmed: true,
+                  specialInstructions: null,
+                },
+              ],
+            }),
+          },
+        ],
+      },
+    ],
+  });
+  const catalog = {
+    store: { orderTypes: ["PICKUP"], paymentMethods: ["CASH"] },
+    categories: [
+      {
+        items: [
+          { id: "11", name: "Cheeseburger", isAvailable: true, variants: [] },
+          {
+            id: "12",
+            name: "Fries",
+            isAvailable: true,
+            variants: [
+              { id: "21", label: "Small" },
+              { id: "22", label: "Large" },
+            ],
+          },
+          { id: "13", name: "Coke", isAvailable: true, variants: [] },
+          {
+            id: "14",
+            name: "Chicken Burger",
+            isAvailable: false,
+            variants: [],
+          },
+        ],
+      },
+    ],
+  } as unknown as Catalog;
+  const review = reviewExtraction(
+    extracted,
+    catalog,
+    { customerName: "Alex" },
+    "Customer: order please",
+    null,
+  );
+  assert.equal(review.suggested.customerName, "Alex");
+  assert.deepEqual(
+    review.suggested.items?.map((item) => [item.productId, item.quantity]),
+    [["11", 2]],
+  );
+  assert.equal(review.unmatchedItems[0].name, "Fries");
+  assert.equal(review.unmatchedItems[1].name, "Coke");
+  assert.match(review.unmatchedItems[1].reason, /Not clearly ordered/);
+  assert.equal(review.unmatchedItems[2].name, "Chicken Burger");
+  assert.equal(review.needsAttention, true);
+  assert.equal(review.suggested.notes, "Requested time: 7:00 PM");
+  assert.ok(
+    review.questions.some((question) => question.includes("payment method")),
+  );
+  assert.ok(
+    review.questions.every((question) => !question.includes("mobile number")),
+  );
+  assert.throws(() =>
+    parseGeminiResponse({
+      steps: [
+        {
+          type: "model_output",
+          content: [{ type: "text", text: '{"items":[]}' }],
+        },
+      ],
+    }),
+  );
+});
+test("Clef-flash response is normalized and invalid choices are rejected", () => {
+  const probabilities = {
+    CREATE_ORDER: 0.66,
+    MODIFY_ORDER: 0.05,
+    CANCEL_ORDER: 0.02,
+    ORDER_STATUS: 0.02,
+    PRODUCT_INQUIRY: 0.12,
+    STORE_INQUIRY: 0.04,
+    PAYMENT_INQUIRY: 0.03,
+    GREETING: 0.03,
+    OTHER: 0.03,
+  };
+  const result = parseClefResponse({
+    success: true,
+    result: {
+      answers: {
+        intent: { choice: "CREATE_ORDER", confidence: 0.66, probabilities },
+        fulfillment: { choice: "pickup", confidence: 0.86 },
+        payment: { choice: "unspecified", confidence: 0.75 },
+        needs_clarification: { type: "noul", noul: 0.62 },
+        requires_llm: { type: "noul", noul: 0.94 },
+        requires_human: { type: "noul", noul: 0.2 },
+      },
+    },
+  });
+  assert.equal(result.model, "clef-flash");
+  assert.equal(result.intent.value, "CREATE_ORDER");
+  assert.equal(result.intent.probabilities?.PRODUCT_INQUIRY, 0.12);
+  assert.equal(result.fulfillment.value, "pickup");
+  assert.equal(result.needsClarificationProbability, 0.62);
+  assert.equal(result.requiresLLMProbability, 0.94);
+  assert.equal(routeChatDecision(result), "EXTRACT_ORDER");
+  assert.equal(canExtractOrderCandidate(result), true);
+  assert.equal(routeChatDecision(null), "EXTRACT_ORDER");
+  const nonOrder = {
+    ...result,
+    intent: {
+      value: "PRODUCT_INQUIRY" as const,
+      confidence: 0.9,
+      probabilities: {
+        ...probabilities,
+        CREATE_ORDER: 0.04,
+        PRODUCT_INQUIRY: 0.9,
+      },
+    },
+  };
+  assert.equal(routeChatDecision(nonOrder), "REVIEW_PRODUCT");
+  assert.equal(chatInboxBucket(result), "POSSIBLE_ORDER");
+  assert.equal(
+    chatInboxBucket({
+      ...result,
+      intent: {
+        value: "CREATE_ORDER",
+        confidence: 0.54,
+        probabilities: { CREATE_ORDER: 0.54, PRODUCT_INQUIRY: 0.07 },
+      },
+      needsClarificationProbability: 0.07,
+      requiresHumanProbability: 0.03,
+    }),
+    "POSSIBLE_ORDER",
+  );
+  assert.equal(chatInboxBucket(nonOrder), "NEEDS_ATTENTION");
+  assert.equal(canExtractOrderCandidate(nonOrder), false);
+  assert.equal(chatInboxBucket(null), "NEEDS_ATTENTION");
+  assert.equal(routeChatDecision(nonOrder, true), "EXTRACT_ORDER");
+  assert.deepEqual(intentDecisionLog("42", nonOrder), {
+    event: "chat_intent_routed",
+    draftId: "42",
+    model: "clef-flash",
+    intent: "PRODUCT_INQUIRY",
+    confidence: 0.9,
+    threshold: 0.65,
+    runnerUp: 0.05,
+    margin: 0.85,
+    marginThreshold: 0.2,
+    route: "REVIEW_PRODUCT",
+    needsClarification: false,
+    requiresLLM: true,
+    requiresHuman: false,
+  });
+  assert.equal(
+    routeChatDecision({
+      ...nonOrder,
+      intent: {
+        ...nonOrder.intent,
+        confidence: 0.46,
+        probabilities: {
+          ...nonOrder.intent.probabilities,
+          PRODUCT_INQUIRY: 0.46,
+          CREATE_ORDER: 0.42,
+        },
+      },
+    }),
+    "REVIEW_UNCLEAR",
+  );
+  const partialOrderDecision = {
+    ...result,
+    intent: {
+      value: "CREATE_ORDER" as const,
+      confidence: 0.45,
+      probabilities: { CREATE_ORDER: 0.45, PRODUCT_INQUIRY: 0.1 },
+    },
+  };
+  assert.equal(routeChatDecision(partialOrderDecision), "REVIEW_UNCLEAR");
+  assert.equal(chatInboxBucket(partialOrderDecision), "NEEDS_ATTENTION");
+  assert.equal(canExtractOrderCandidate(partialOrderDecision), true);
+  assert.equal(
+    canExtractOrderCandidate({
+      ...partialOrderDecision,
+      intent: {
+        ...partialOrderDecision.intent,
+        probabilities: { CREATE_ORDER: 0.45, PRODUCT_INQUIRY: 0.42 },
+      },
+    }),
+    true,
+  );
+  assert.throws(() =>
+    parseClefResponse({ success: false, result: { answers: {} } }),
+  );
+  assert.throws(() =>
+    parseClefResponse({
+      answers: {
+        intent: { choice: "approved", confidence: 0.99 },
+        fulfillment: { choice: "pickup", confidence: 0.86 },
+        payment: { choice: "cash", confidence: 0.9 },
+        needs_clarification: { type: "noul", noul: 0.2 },
+        requires_llm: { type: "noul", noul: 0.2 },
+        requires_human: { type: "noul", noul: 0.2 },
+      },
+    }),
+  );
+});
+test("nine intents route conservatively and never mutate an order", () => {
+  const base = {
+    model: "clef-flash" as const,
+    fulfillment: { value: "unspecified" as const, confidence: 0.9 },
+    payment: { value: "unspecified" as const, confidence: 0.9 },
+    needsClarificationProbability: 0.2,
+    requiresHumanProbability: 0.2,
+    analyzedAt: new Date().toISOString(),
+  };
+  const cases = [
+    ["CREATE_ORDER", "EXTRACT_ORDER"],
+    ["MODIFY_ORDER", "REVIEW_MODIFICATION"],
+    ["CANCEL_ORDER", "REVIEW_CANCELLATION"],
+    ["ORDER_STATUS", "REVIEW_STATUS"],
+    ["PRODUCT_INQUIRY", "REVIEW_PRODUCT"],
+    ["STORE_INQUIRY", "REVIEW_STORE"],
+    ["PAYMENT_INQUIRY", "REVIEW_PAYMENT"],
+    ["GREETING", "REVIEW_GREETING"],
+    ["OTHER", "REVIEW_OTHER"],
+  ] as const;
+  for (const [value, expected] of cases) {
+    const decision = {
+      ...base,
+      intent: { value, confidence: 0.95 },
+    };
+    assert.equal(routeChatDecision(decision), expected, value);
+    assert.equal(
+      chatInboxBucket(decision),
+      value === "CREATE_ORDER"
+        ? "POSSIBLE_ORDER"
+        : value === "GREETING" || value === "OTHER"
+          ? "NORMAL"
+          : "NEEDS_ATTENTION",
+    );
+  }
+  assert.equal(
+    chatInboxBucket({
+      ...base,
+      intent: { value: "CREATE_ORDER", confidence: 0.95 },
+      needsClarificationProbability: 0.9,
+    }),
+    "NEEDS_ATTENTION",
+  );
+  assert.equal(
+    chatInboxBucket({
+      ...base,
+      intent: { value: "OTHER", confidence: 0.95 },
+      requiresHumanProbability: 0.9,
+    }),
+    "NEEDS_ATTENTION",
+  );
+  assert.equal(
+    chatInboxBucket({
+      ...base,
+      intent: { value: "GREETING", confidence: 0.95 },
+      needsClarificationProbability: 0.9,
+    }),
+    "NORMAL",
+  );
+  assert.equal(
+    routeChatDecision({
+      ...base,
+      intent: { value: "CANCEL_ORDER", confidence: 0.89 },
+    }),
+    "REVIEW_CANCELLATION",
+  );
+  assert.equal(
+    routeChatDecision({
+      ...base,
+      intent: {
+        value: "CANCEL_ORDER",
+        confidence: 0.89,
+        probabilities: { CANCEL_ORDER: 0.89, OTHER: 0.11 },
+      },
+    }),
+    "REVIEW_UNCLEAR",
+  );
+  assert.equal(
+    routeChatDecision({
+      ...base,
+      intent: { value: "order_request", confidence: 0.95 },
+    }),
+    "EXTRACT_ORDER",
+  );
+});
+test("inquiry context uses configured catalog facts without guessing products", () => {
+  const catalog = {
+    store: {
+      address: "12 Market St",
+      contactPhone: "09171234567",
+      operatingHours: null,
+      orderTypes: ["PICKUP", "DELIVERY"],
+      paymentMethods: ["CASH", "GCASH"],
+      gcashAccountName: "Store Owner",
+      gcashNumber: "09179990000",
+    },
+    categories: [
+      {
+        items: [
+          {
+            name: "Cheeseburger",
+            price: "149.00",
+            isAvailable: true,
+            variants: [],
+          },
+          {
+            name: "Fries",
+            price: "80.00",
+            isAvailable: false,
+            variants: [],
+          },
+        ],
+      },
+    ],
+  } as unknown as Catalog;
+  const product = inquiryContext(
+    "REVIEW_PRODUCT",
+    catalog,
+    "Customer: Magkano ang cheeseburger?",
+  );
+  assert.deepEqual(product?.facts, ["Cheeseburger — Available · ₱149.00"]);
+  assert.match(
+    inquiryContext("REVIEW_PRODUCT", catalog, "Customer: May burger?")!
+      .facts[0],
+    /No exact product name/,
+  );
+  assert.ok(
+    inquiryContext("REVIEW_STORE", catalog, "Customer: Saan kayo?")!.facts.some(
+      (fact) => fact.includes("12 Market St"),
+    ),
+  );
+  assert.ok(
+    inquiryContext("REVIEW_PAYMENT", catalog, "Customer: GCash?")!.facts.some(
+      (fact) => fact.includes("09179990000"),
+    ),
+  );
+  assert.equal(inquiryContext("REVIEW_CANCELLATION", catalog, "Cancel"), null);
+});
+test("stale Clef results cannot replace the current conversation decision", async () => {
+  const previousQuery = pool.query;
+  const decision = parseClefResponse({
+    answers: {
+      intent: {
+        choice: "CREATE_ORDER",
+        confidence: 0.91,
+        probabilities: {
+          CREATE_ORDER: 0.91,
+          MODIFY_ORDER: 0.01,
+          CANCEL_ORDER: 0.01,
+          ORDER_STATUS: 0.01,
+          PRODUCT_INQUIRY: 0.02,
+          STORE_INQUIRY: 0.01,
+          PAYMENT_INQUIRY: 0.01,
+          GREETING: 0.01,
+          OTHER: 0.01,
+        },
+      },
+      fulfillment: { choice: "unspecified", confidence: 0.9 },
+      payment: { choice: "unspecified", confidence: 0.9 },
+      needs_clarification: { type: "noul", noul: 0.8 },
+      requires_llm: { type: "noul", noul: 0.9 },
+      requires_human: { type: "noul", noul: 0.3 },
+    },
+  });
+  pool.query = (async (sql: string, params: unknown[]) => {
+    assert.equal(params[0], "42");
+    assert.match(sql, /conversation_text = \$2/);
+    assert.equal(params[1], "Customer: Hello");
+    return { rows: [] }; // The transcript changed while Clef was running.
+  }) as typeof pool.query;
+  try {
+    assert.equal(
+      await savePublicChatDecision("42", "Customer: Hello", decision),
+      false,
+    );
+  } finally {
+    pool.query = previousQuery;
+  }
+});
+test("the inbox groups chats by their latest decision", async () => {
+  const previousQuery = pool.query;
+  const decision = {
+    model: "clef-flash" as const,
+    intent: { value: "CREATE_ORDER" as const, confidence: 0.95 },
+    fulfillment: { value: "unspecified" as const, confidence: 0.8 },
+    payment: { value: "unspecified" as const, confidence: 0.8 },
+    needsClarificationProbability: 0.2,
+    requiresHumanProbability: 0.2,
+    analyzedAt: new Date().toISOString(),
+  };
+  pool.query = (async (sql: string, params: unknown[]) => {
+    assert.match(sql, /chat_messages->-1->>'text'/);
+    assert.doesNotMatch(sql, /initial_decision/);
+    assert.deepEqual(params, ["7", "9"]);
+    const row = {
+      storeId: "9",
+      source: "WEB_CHAT",
+      draftData: {},
+      latestMessage: "Pa-order po",
+      status: "DRAFT",
+      orderId: null,
+      createdAt: new Date("2026-01-01"),
+      updatedAt: new Date("2026-01-02"),
+    };
+    return {
+      rows: [
+        { ...row, id: "1", decision },
+        {
+          ...row,
+          id: "2",
+          latestMessage: "Cancel ko na",
+          decision: {
+            ...decision,
+            intent: { value: "CANCEL_ORDER", confidence: 0.95 },
+          },
+        },
+      ],
+    };
+  }) as typeof pool.query;
+  try {
+    const drafts = await listChatOrderDrafts("7", "9");
+    assert.deepEqual(
+      drafts.map(({ inboxBucket, latestMessage }) => [
+        inboxBucket,
+        latestMessage,
+      ]),
+      [
+        ["POSSIBLE_ORDER", "Pa-order po"],
+        ["NEEDS_ATTENTION", "Cancel ko na"],
+      ],
+    );
+  } finally {
+    pool.query = previousQuery;
+  }
+});
+test("chat drafts validate pasted text and require reviewable order items", () => {
+  assert.equal(
+    createChatOrderDraftSchema.safeParse({
+      source: "MESSENGER",
+      conversationText: "Customer: I would like to order",
+    }).success,
+    true,
+  );
+  assert.equal(
+    createChatOrderDraftSchema.safeParse({
+      source: "WHATSAPP",
+      conversationText: "Hello, I want to place an order",
+    }).success,
+    false,
+  );
+  assert.equal(
+    confirmChatOrderDraftSchema.safeParse({
+      customerName: "Alex Customer",
+      customerPhone: "09171234567",
+      orderType: "PICKUP",
+      paymentMethod: "CASH",
+      items: [],
+    }).success,
+    false,
+  );
+  assert.equal(
+    confirmChatOrderDraftSchema.safeParse({
+      customerName: "Alex Customer",
+      orderType: "PICKUP",
+      paymentMethod: "CASH",
+      items: [{ productId: "1", variantId: null, quantity: 1 }],
+    }).success,
+    true,
+  );
+});
+test("public customer chat starts with a private token and saves messages", async () => {
+  const previousQuery = pool.query;
+  let storedHash = "";
+  let storedName = "";
+  let storedMessages: { id: string; text: string; createdAt: string }[] = [];
+  pool.query = (async (sql: string, params: unknown[]) => {
+    if (sql.startsWith("INSERT INTO chat_order_drafts")) {
+      storedName = (JSON.parse(params[1] as string) as { customerName: string })
+        .customerName;
+      storedHash = params[2] as string;
+      return { rows: [{ id: "42" }] };
+    }
+    if (sql.startsWith("UPDATE chat_order_drafts d SET chat_messages")) {
+      assert.equal(params[0], storedHash);
+      storedMessages = [
+        ...storedMessages,
+        {
+          id: params[1] as string,
+          text: params[2] as string,
+          createdAt: params[3] as string,
+        },
+      ];
+      return {
+        rows: [
+          {
+            id: "42",
+            chatMessages: storedMessages,
+            conversationText: `Customer: ${storedMessages.map((message) => message.text).join("\nCustomer: ")}`,
+          },
+        ],
+      };
+    }
+    if (sql.startsWith("SELECT draft_data AS")) {
+      assert.equal(params[0], storedHash);
+      return {
+        rows: [
+          {
+            draftData: { customerName: storedName },
+            chatMessages: storedMessages,
+            status: "DRAFT",
+          },
+        ],
+      };
+    }
+    throw new Error(`Unexpected database query: ${sql}`);
+  }) as typeof pool.query;
+  try {
+    const invalid = await fetch(`${base}/public/chats/stores/coffee-shop`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ customerName: "A" }),
+    });
+    assert.equal(invalid.status, 400);
+    const started = await fetch(`${base}/public/chats/stores/coffee-shop`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ customerName: "Alex Customer" }),
+    });
+    assert.equal(started.status, 201);
+    const { token, chat } = (await started.json()) as {
+      token: string;
+      chat: { customerName: string };
+    };
+    assert.equal(chat.customerName, "Alex Customer");
+    assert.equal(storedHash, createHash("sha256").update(token).digest("hex"));
+    assert.equal((await fetch(`${base}/public/chats/invalid`)).status, 400);
+    const messageId = randomUUID();
+    const sent = await fetch(`${base}/public/chats/${token}/messages`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ messageId, text: "Two iced coffees, please" }),
+    });
+    assert.equal(sent.status, 200);
+    assert.equal(
+      (await sent.json()).messages[0].text,
+      "Two iced coffees, please",
+    );
+    const resumed = await fetch(`${base}/public/chats/${token}`);
+    assert.equal(resumed.status, 200);
+    assert.equal((await resumed.json()).chat.messages[0].id, messageId);
+  } finally {
+    pool.query = previousQuery;
   }
 });
 test("tokens for another audience or signed with another key are rejected", async () => {
@@ -319,7 +960,7 @@ test("schemas preserve bigint IDs and reject invalid input", () => {
   );
 });
 
-test("dine-in orders do not require a phone number and accept an optional table", () => {
+test("mobile numbers are optional for checkout while delivery still needs an address", () => {
   const dineInOrder = {
     storeSlug: "cafe",
     idempotencyKey: "123e4567-e89b-12d3-a456-426614174000",
@@ -343,7 +984,7 @@ test("dine-in orders do not require a phone number and accept an optional table"
       ...dineInOrder,
       orderType: "PICKUP",
     }).success,
-    false,
+    true,
   );
   assert.equal(
     createOrderSchema.safeParse({
@@ -359,6 +1000,29 @@ test("dine-in orders do not require a phone number and accept an optional table"
       orderType: "PICKUP",
       customerPhone: "09171234567",
       tableNumber: "12",
+    }).success,
+    false,
+  );
+  assert.equal(
+    createOrderSchema.safeParse({
+      ...dineInOrder,
+      orderType: "DELIVERY",
+      deliveryAddress: "12 Market Street",
+    }).success,
+    true,
+  );
+  assert.equal(
+    createOrderSchema.safeParse({
+      ...dineInOrder,
+      orderType: "DELIVERY",
+    }).success,
+    false,
+  );
+  assert.equal(
+    createOrderSchema.safeParse({
+      ...dineInOrder,
+      orderType: "PICKUP",
+      customerPhone: "not-a-phone",
     }).success,
     false,
   );

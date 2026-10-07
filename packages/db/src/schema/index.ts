@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
@@ -10,6 +10,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
 
@@ -29,6 +30,12 @@ export const orderTypeEnum = pgEnum("order_type", [
 ]);
 export const paymentMethodEnum = pgEnum("payment_method", ["CASH", "GCASH"]);
 export const paymentStatusEnum = pgEnum("payment_status", ["UNPAID", "PAID"]);
+export const orderSourceEnum = pgEnum("order_source", [
+  "MENU",
+  "MESSENGER",
+  "INSTAGRAM",
+  "WEB_CHAT",
+]);
 
 export const users = pgTable("users", {
   id: bigint("id", { mode: "bigint" }).primaryKey().generatedAlwaysAsIdentity(),
@@ -150,10 +157,81 @@ export const orders = pgTable("orders", {
   paymentStatus: paymentStatusEnum("payment_status")
     .notNull()
     .default("UNPAID"),
+  source: orderSourceEnum("source").notNull().default("MENU"),
   paymentInstructions: jsonb("payment_instructions"),
   deliveryFee: numeric("delivery_fee", { precision: 10, scale: 2 }),
   total: numeric("total", { precision: 10, scale: 2 }).notNull().default("0"),
   notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const chatOrderDrafts = pgTable(
+  "chat_order_drafts",
+  {
+    id: bigint("id", { mode: "bigint" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity(),
+    storeId: bigint("store_id", { mode: "bigint" })
+      .notNull()
+      .references(() => stores.id, { onDelete: "cascade" }),
+    source: orderSourceEnum("source").notNull(),
+    conversationText: text("conversation_text").notNull(),
+    draftData: jsonb("draft_data").notNull().default({}),
+    decision: jsonb("decision"),
+    accessTokenHash: varchar("access_token_hash", { length: 64 }).unique(),
+    providerConversationId: varchar("provider_conversation_id", {
+      length: 255,
+    }),
+    chatMessages: jsonb("chat_messages").notNull().default([]),
+    status: varchar("status", { length: 16 }).notNull().default("DRAFT"),
+    orderId: bigint("order_id", { mode: "bigint" }).references(
+      () => orders.id,
+      { onDelete: "set null" },
+    ),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("chat_order_drafts_store_status_idx").on(table.storeId, table.status),
+    uniqueIndex("chat_order_drafts_external_active_idx")
+      .on(table.storeId, table.providerConversationId)
+      .where(
+        sql`${table.providerConversationId} IS NOT NULL AND ${table.status} = 'DRAFT'`,
+      ),
+  ],
+);
+
+export const metaPageConnections = pgTable("meta_page_connections", {
+  storeId: bigint("store_id", { mode: "bigint" })
+    .primaryKey()
+    .references(() => stores.id, { onDelete: "cascade" }),
+  pageId: varchar("page_id", { length: 64 }).notNull().unique(),
+  pageName: varchar("page_name", { length: 255 }).notNull(),
+  encryptedPageAccessToken: text("encrypted_page_access_token").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const metaOauthSessions = pgTable("meta_oauth_sessions", {
+  tokenHash: varchar("token_hash", { length: 64 }).primaryKey(),
+  storeId: bigint("store_id", { mode: "bigint" })
+    .notNull()
+    .references(() => stores.id, { onDelete: "cascade" }),
+  ownerId: bigint("owner_id", { mode: "bigint" })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  pages: jsonb("pages").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -247,4 +325,5 @@ export const schema = {
   productVariants,
   orders,
   orderItems,
+  chatOrderDrafts,
 };

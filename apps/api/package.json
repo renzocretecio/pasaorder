@@ -8,6 +8,8 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
+    "ai:check:clef": "tsx src/scripts/check-clef.ts",
+    "ai:check:gemini": "tsx src/scripts/check-gemini.ts",
     "test": "tsx --test tests/*.test.ts"
   },
   "keywords": [],

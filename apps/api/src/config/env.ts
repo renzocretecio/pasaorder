@@ -18,6 +18,25 @@ export const envSchema = z.object({
       "Generate a real secret with pnpm env:setup",
     ),
   WEB_ORIGIN: z.string().url().default("http://localhost:3000"),
+  CLOUDFLARE_AI_ACCOUNT_ID: z.string().min(1).optional(),
+  CLOUDFLARE_AI_API_TOKEN: z.string().min(1).optional(),
+  GEMINI_API_KEY: z.string().min(1).optional(),
+  META_APP_ID: z.string().min(1).optional(),
+  META_APP_SECRET: z.string().min(1).optional(),
+  META_WEBHOOK_VERIFY_TOKEN: z.string().min(1).optional(),
+  META_VERIFY_TOKEN: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z.string().min(1).optional(),
+  ),
+  META_TOKEN_ENCRYPTION_KEY: z
+    .string()
+    .regex(/^[a-fA-F0-9]{64}$/)
+    .optional(),
+  META_REDIRECT_URI: z.string().url().optional(),
+  META_GRAPH_API_VERSION: z
+    .string()
+    .regex(/^v\d+\.\d+$/)
+    .default("v26.0"),
   OCI_NAMESPACE: z
     .string()
     .regex(/^[a-z0-9-]+$/)

@@ -1,0 +1,1 @@
+ALTER TABLE "chat_order_drafts" DROP COLUMN "initial_decision";
