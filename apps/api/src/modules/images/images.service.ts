@@ -14,7 +14,7 @@ export const imageNamePattern =
 export const imagePrefixPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 export type ImageKind = "logo" | "banner" | "product" | "payment-qr";
 
-const uploadPrefix = env.OCI_IMAGE_PREFIX ?? env.NODE_ENV;
+const uploadPrefix = env.IMAGE_PREFIX ?? env.NODE_ENV;
 
 export function imageObjectKey(name: string, prefix?: string) {
   if (
@@ -26,35 +26,35 @@ export function imageObjectKey(name: string, prefix?: string) {
 }
 
 let client: S3Client | undefined;
+
 function storage() {
-  const {
-    OCI_NAMESPACE,
-    OCI_REGION,
-    OCI_BUCKET_NAME,
-    OCI_ACCESS_KEY_ID,
-    OCI_SECRET_ACCESS_KEY,
-  } = env;
   if (
-    !OCI_NAMESPACE ||
-    !OCI_REGION ||
-    !OCI_BUCKET_NAME ||
-    !OCI_ACCESS_KEY_ID ||
-    !OCI_SECRET_ACCESS_KEY
+    !env.R2_ENDPOINT ||
+    !env.R2_BUCKET_NAME ||
+    !env.R2_ACCESS_KEY_ID ||
+    !env.R2_SECRET_ACCESS_KEY
   )
-    throw new AppError(503, "Image storage is not configured");
+    throw new AppError(503, "R2 image storage is not configured");
+
   client ??= new S3Client({
-    region: OCI_REGION,
-    endpoint: `https://${OCI_NAMESPACE}.compat.objectstorage.${OCI_REGION}.oci.customer-oci.com`,
+    region: "auto",
+    endpoint: env.R2_ENDPOINT,
     credentials: {
-      accessKeyId: OCI_ACCESS_KEY_ID,
-      secretAccessKey: OCI_SECRET_ACCESS_KEY,
+      accessKeyId: env.R2_ACCESS_KEY_ID,
+      secretAccessKey: env.R2_SECRET_ACCESS_KEY,
     },
-    forcePathStyle: true,
     requestChecksumCalculation: "WHEN_REQUIRED",
     responseChecksumValidation: "WHEN_REQUIRED",
     maxAttempts: 2,
   });
-  return { client, bucket: OCI_BUCKET_NAME };
+  return { client, bucket: env.R2_BUCKET_NAME };
+}
+
+function missingObject(error: unknown) {
+  return (
+    error instanceof Error &&
+    (error.name === "NoSuchKey" || error.name === "NotFound")
+  );
 }
 
 export async function prepareImage(bytes: Buffer, kind: ImageKind) {
@@ -108,11 +108,7 @@ export async function readImage(name: string, prefix?: string) {
       new GetObjectCommand({ Bucket: bucket, Key: key }),
     );
   } catch (error) {
-    if (
-      error instanceof Error &&
-      (error.name === "NoSuchKey" || error.name === "NotFound")
-    )
-      throw new AppError(404, "Image not found");
-    throw error;
+    if (!missingObject(error)) throw error;
+    throw new AppError(404, "Image not found");
   }
 }

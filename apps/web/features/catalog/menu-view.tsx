@@ -18,7 +18,6 @@ import {
   type Catalog,
   type OrderType,
   type Product,
-  type ProductVariant,
   type Weekday,
 } from "@pasaorder/types";
 import { Button } from "@/components/ui/button";
@@ -27,13 +26,7 @@ import { MenuCategories } from "./menu-categories";
 import { accentInk, accentText, peso } from "./color";
 import { CartCheckout } from "./cart-checkout";
 
-type CartLine = {
-  key: string;
-  item: Product;
-  variant: ProductVariant | null;
-  quantity: number;
-  instructions: string;
-};
+import { useMenuRecovery } from "./use-menu-recovery";
 
 function getLocalWeekday(): Weekday {
   return weekdays[(new Date().getDay() + 6) % 7];
@@ -119,7 +112,8 @@ export function MenuView({
   const [selectedVariantId, setSelectedVariantId] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [instructions, setInstructions] = useState("");
-  const [cart, setCart] = useState<CartLine[]>([]);
+  const { cart, setCart, cartAdjusted, saved, online, refreshing } =
+    useMenuRecovery(catalog, preview);
   const [cartOpen, setCartOpen] = useState(false);
   const [addedMessage, setAddedMessage] = useState("");
   const selectedVariant =
@@ -154,7 +148,7 @@ export function MenuView({
       if (existing)
         return current.map((line) =>
           line.key === key
-            ? { ...line, quantity: line.quantity + quantity }
+            ? { ...line, quantity: Math.min(100, line.quantity + quantity) }
             : line,
         );
       return [
@@ -193,6 +187,25 @@ export function MenuView({
           </Link>
         </div>
       )}
+      {!preview &&
+        (!online || refreshing || cartAdjusted || cart.length > 0) && (
+          <div
+            role="status"
+            className="border-b border-[#d6dfd6] bg-white px-5 py-3 text-sm text-[#59685d] sm:px-8"
+          >
+            <p className="mx-auto max-w-5xl">
+              {!online
+                ? "You’re offline. You can keep editing this menu’s cart. Reconnect to place your order."
+                : refreshing
+                  ? "Connection restored. Refreshing the menu…"
+                  : cartAdjusted
+                    ? "Some saved items or options are no longer available and were removed. Please review your cart."
+                    : saved
+                      ? "Your cart is saved on this device for 7 days. Prices and availability are checked at checkout."
+                      : "Keep this tab open to keep your cart. Saving on this device is unavailable."}
+            </p>
+          </div>
+        )}
       <header
         id="store-profile"
         aria-labelledby="store-name"
@@ -514,7 +527,10 @@ export function MenuView({
                   <button
                     type="button"
                     aria-label="Increase quantity"
-                    onClick={() => setQuantity((current) => current + 1)}
+                    disabled={quantity >= 100}
+                    onClick={() =>
+                      setQuantity((current) => Math.min(100, current + 1))
+                    }
                     className="grid size-11 place-items-center rounded-r-xl text-[var(--store-accent-ink)] hover:bg-accent focus-visible:outline-2 focus-visible:outline-[var(--store-accent-ink)]"
                   >
                     <Plus className="size-4" aria-hidden="true" />
@@ -540,6 +556,9 @@ export function MenuView({
       </Dialog.Root>
 
       <CartCheckout
+        online={online}
+        refreshing={refreshing}
+        persistCheckout={!preview}
         open={cartOpen}
         onOpenChange={setCartOpen}
         storeSlug={store.slug}

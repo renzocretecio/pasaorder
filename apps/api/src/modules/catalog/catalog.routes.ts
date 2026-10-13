@@ -6,6 +6,7 @@ import {
   catalogItemSchema,
   publicationSchema,
   catalogOrderSchema,
+  catalogImportSchema,
   idSchema,
   slugSchema,
 } from "@pasaorder/validation";
@@ -91,6 +92,17 @@ router.post("/stores/:id/items", async (req, res) => {
         idSchema.parse(req.params.id),
         undefined,
         catalogItemSchema.parse(req.body),
+        req.auth!.userId,
+      ),
+    );
+});
+router.post("/stores/:id/items/import", async (req, res) => {
+  res
+    .status(201)
+    .json(
+      await repository.importItems(
+        idSchema.parse(req.params.id),
+        catalogImportSchema.parse(req.body),
         req.auth!.userId,
       ),
     );

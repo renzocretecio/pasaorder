@@ -11,10 +11,13 @@ export const metadata: Metadata = { title: "Customer chats | PasaOrder" };
 
 export default async function ChatOrdersPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ filter?: string }>;
 }) {
   const { id } = await params;
+  const { filter } = await searchParams;
   const [{ store }, { drafts, analysisAvailable }] = await Promise.all([
     getOwnerCatalog(id),
     ownerApi<{ drafts: ChatOrderDraftSummary[]; analysisAvailable: boolean }>(
@@ -25,9 +28,8 @@ export default async function ChatOrdersPage({
   return (
     <>
       <PageHeading
-        eyebrow={`${store.name} / Customer chats`}
         title="Customer chats"
-        description="Review possible orders and conversations that need your attention. Chats move as customers reply."
+        description={`${store.name} · Review possible orders and conversations that need your attention. Chats move as customers reply.`}
       >
         <Button asChild variant="outline" className="min-h-11 rounded-xl">
           <Link
@@ -44,6 +46,7 @@ export default async function ChatOrdersPage({
         storeId={id}
         drafts={drafts}
         analysisAvailable={analysisAvailable}
+        initialFilter={filter}
       />
     </>
   );

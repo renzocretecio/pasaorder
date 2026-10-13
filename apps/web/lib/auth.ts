@@ -13,14 +13,19 @@ export class ApiError extends Error {
     super(message);
   }
 }
+export function authApiBaseUrl() {
+  return (
+    process.env.API_URL ??
+    process.env.NEXT_PUBLIC_API_URL ??
+    "http://localhost:4000/api"
+  ).replace(/\/$/, "");
+}
+
 export async function authApi<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const base =
-    process.env.API_URL ??
-    process.env.NEXT_PUBLIC_API_URL ??
-    "http://localhost:4000/api";
+  const base = authApiBaseUrl();
   let response: Response;
   try {
     response = await fetch(`${base.replace(/\/$/, "")}${path}`, {
@@ -44,6 +49,13 @@ export async function authApi<T>(
   }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
+}
+export async function googleOAuthEnabled() {
+  try {
+    return (await authApi<{ enabled: boolean }>("/auth/google/status")).enabled;
+  } catch {
+    return false;
+  }
 }
 export async function currentUser(): Promise<AuthUser | null> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;

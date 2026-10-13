@@ -1,0 +1,8 @@
+# Landing page image provenance
+
+Both photographs were generated with ChatGPT Image on 2026-10-09 and converted to WebP with ffmpeg at quality 84. They are illustrative imagery, not photographs of PasaOrder customers or real merchants.
+
+| Shipping asset                                | Source generation                               | Prompt                                                                                                                                                                                                                                                                |
+| --------------------------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `public/images/landing/merchant-counter.webp` | `exec-f2e64273-4f8d-4567-a328-b7c34fa65599.png` | Candid modern Filipino neighborhood store owner at a compact counter, reviewing an order on a phone and preparing a paper bag; mix of everyday catalog items, daylight, forest green and warm neutral palette, wide editorial composition, no logos or readable text. |
+| `public/images/landing/customer-qr.webp`      | `exec-8097bf4d-1815-4290-93f7-7b8fbca6ee3a.png` | Customer at a Filipino neighborhood shop scanning a QR code card with a phone, friendly owner in background; vertical editorial photograph, warm natural light, no logos or readable screen text.                                                                     |

@@ -2,6 +2,11 @@
 node_modules/
 .pnp.*
 .pnpm-store/
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.py[cod]
 
 # Generated application and build output
 dist/

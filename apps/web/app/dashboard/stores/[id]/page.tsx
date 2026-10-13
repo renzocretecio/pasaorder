@@ -18,9 +18,8 @@ export default async function StoreCatalog({
   return (
     <>
       <PageHeading
-        eyebrow="Stores / Catalog"
-        title={store.name}
-        description="Keep your items up to date, then share your catalog."
+        title="Catalog"
+        description={`${store.name} · Keep your items up to date, then share your catalog.`}
       >
         <Button asChild variant="outline" className="h-12 rounded-xl bg-card">
           <Link href={`${base}/preview`}>

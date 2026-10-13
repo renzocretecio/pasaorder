@@ -2,12 +2,10 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
 export function PageHeading({
-  eyebrow,
   title,
   description,
   children,
 }: {
-  eyebrow: string;
   title: string;
   description?: string;
   children?: ReactNode;
@@ -15,7 +13,6 @@ export function PageHeading({
   return (
     <header className="mb-7 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between md:mb-8">
       <div className="min-w-0">
-        <p className="mb-2 text-[13px] text-muted-foreground">{eyebrow}</p>
         <h1 className="break-words text-[28px] font-[650] leading-[1.2] tracking-[-0.025em]">
           {title}
         </h1>
@@ -26,7 +23,9 @@ export function PageHeading({
         )}
       </div>
       {children && (
-        <div className="flex shrink-0 flex-wrap gap-2">{children}</div>
+        <div className="flex w-full shrink-0 flex-wrap gap-2 sm:w-auto sm:justify-end">
+          {children}
+        </div>
       )}
     </header>
   );
@@ -51,11 +50,7 @@ export function EditorPanel({
         <ArrowLeft className="size-4" aria-hidden="true" />
         {back === "/dashboard" ? "Back to stores" : "Back to catalog"}
       </Link>
-      <PageHeading
-        eyebrow="Store workspace"
-        title={title}
-        description={description}
-      />
+      <PageHeading title={title} description={description} />
       <div className="rounded-2xl border bg-card p-5 pb-7 sm:p-7">
         {children}
       </div>

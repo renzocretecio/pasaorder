@@ -14,12 +14,11 @@ export default async function Dashboard() {
     "/catalog/stores",
   );
   const defaultStore = stores.find((store) => store.isDefault) ?? stores[0];
-  if (defaultStore) redirect(`/dashboard/stores/${defaultStore.id}`);
+  if (defaultStore) redirect(`/dashboard/stores/${defaultStore.id}/overview`);
 
   return (
     <>
       <PageHeading
-        eyebrow="PasaOrder / Workspace"
         title="Your store starts here"
         description="Set up a store, add your catalog, and share it with customers."
       />

@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   createOrderSchema,
   idSchema,
+  overviewDateRangeSchema,
   updatePaymentStatusSchema,
   updateOrderStatusSchema,
   createChatOrderDraftSchema,
@@ -16,8 +17,11 @@ import {
 import { AppError } from "../../middleware/errors.js";
 import { requireAuth } from "../../middleware/auth.js";
 import * as repository from "./orders.repository.js";
-import { emitOrdersChanged } from "../../realtime/socket.js";
-import { analyzeChatConversation, clefAvailable } from "./clef.service.js";
+import { emitChatsChanged, emitOrdersChanged } from "../../realtime/socket.js";
+import {
+  analyzeChatConversation,
+  thinklessAvailable,
+} from "./thinkless.service.js";
 import {
   canExtractOrderCandidate,
   intentDecisionLog,
@@ -53,12 +57,14 @@ publicChatRouter.post("/:token/messages", async (req, res) => {
     text,
   );
   res.json({ messages });
-  if (updated && clefAvailable()) {
+  if (updated) emitChatsChanged(updated.storeId);
+  if (updated && thinklessAvailable()) {
     // The customer response is already sent. A slow provider cannot delay chat.
     void (async () => {
       try {
         const decision = await analyzeChatConversation(
           updated.conversationText,
+          updated.id,
         );
         const saved = await repository.savePublicChatDecision(
           updated.id,
@@ -67,9 +73,10 @@ publicChatRouter.post("/:token/messages", async (req, res) => {
         );
         if (saved) {
           console.info(JSON.stringify(intentDecisionLog(updated.id, decision)));
+          emitChatsChanged(updated.storeId);
         }
       } catch {
-        // Keep the chat usable if Clef or persistence fails.
+        // Keep the chat usable if classification or persistence fails.
         console.warn(
           JSON.stringify({
             event: "chat_intent_analysis_failed",
@@ -82,10 +89,50 @@ publicChatRouter.post("/:token/messages", async (req, res) => {
 });
 
 ownerOrdersRouter.use(requireAuth);
+ownerOrdersRouter.get("/stores/:storeId/overview", async (req, res) => {
+  const storeId = idSchema.parse(req.params.storeId);
+  const range =
+    req.query.from === undefined && req.query.to === undefined
+      ? undefined
+      : overviewDateRangeSchema.parse({
+          from: req.query.from,
+          to: req.query.to,
+        });
+  res.json({
+    overview: await repository.getStoreOverview(
+      req.auth!.userId,
+      storeId,
+      range,
+    ),
+  });
+});
+ownerOrdersRouter.get("/stores/:storeId/recent-orders", async (req, res) => {
+  const storeId = idSchema.parse(req.params.storeId);
+  res.json({
+    orders: await repository.listRecentOrders(req.auth!.userId, storeId),
+  });
+});
+ownerOrdersRouter.get("/stores/:storeId/history", async (req, res) => {
+  const storeId = idSchema.parse(req.params.storeId);
+  const query = z
+    .object({
+      cursor: z.string().max(256).optional(),
+      payment: z.enum(["ALL", "UNPAID"]).default("ALL"),
+    })
+    .parse(req.query);
+  res.json(
+    await repository.listPastOrders(
+      req.auth!.userId,
+      storeId,
+      query.cursor,
+      query.payment,
+    ),
+  );
+});
 ownerOrdersRouter.get("/stores/:storeId/chat-drafts", async (req, res) => {
   const storeId = idSchema.parse(req.params.storeId);
   res.json({
-    analysisAvailable: clefAvailable(),
+    analysisAvailable: thinklessAvailable(),
     drafts: await repository.listChatOrderDrafts(req.auth!.userId, storeId),
   });
 });
@@ -97,9 +144,13 @@ ownerOrdersRouter.post("/stores/:storeId/chat-drafts", async (req, res) => {
     storeId,
     input,
   );
-  if (clefAvailable()) {
+  emitChatsChanged(storeId);
+  if (thinklessAvailable()) {
     try {
-      const decision = await analyzeChatConversation(input.conversationText);
+      const decision = await analyzeChatConversation(
+        input.conversationText,
+        draft.id,
+      );
       await repository.saveChatDecision(
         req.auth!.userId,
         draft.id,
@@ -108,6 +159,7 @@ ownerOrdersRouter.post("/stores/:storeId/chat-drafts", async (req, res) => {
       );
       console.info(JSON.stringify(intentDecisionLog(draft.id, decision)));
       draft.decision = decision;
+      emitChatsChanged(storeId);
     } catch {
       // A provider error must not prevent an owner from working on a manual draft.
     }
@@ -116,7 +168,7 @@ ownerOrdersRouter.post("/stores/:storeId/chat-drafts", async (req, res) => {
 });
 ownerOrdersRouter.get("/chat-drafts/:id", async (req, res) => {
   res.json({
-    analysisAvailable: clefAvailable(),
+    analysisAvailable: thinklessAvailable(),
     extractionAvailable: geminiAvailable(),
     draft: await repository.getChatOrderDraft(
       req.auth!.userId,
@@ -136,9 +188,12 @@ ownerOrdersRouter.post("/chat-drafts/:id/prepare", async (req, res) => {
   if (draft.status !== "DRAFT")
     throw new AppError(409, "This order was already confirmed.");
   let decision = draft.decision;
-  if (clefAvailable() && !decision) {
+  if (thinklessAvailable() && !decision) {
     try {
-      decision = await analyzeChatConversation(draft.conversationText);
+      decision = await analyzeChatConversation(
+        draft.conversationText,
+        draft.id,
+      );
       await repository.saveChatDecision(
         req.auth!.userId,
         draft.id,
@@ -146,6 +201,7 @@ ownerOrdersRouter.post("/chat-drafts/:id/prepare", async (req, res) => {
         decision,
       );
       console.info(JSON.stringify(intentDecisionLog(draft.id, decision)));
+      emitChatsChanged(draft.storeId);
     } catch (error) {
       if (error instanceof AppError) throw error;
       decision = null;
@@ -206,18 +262,20 @@ ownerOrdersRouter.post("/chat-drafts/:id/prepare", async (req, res) => {
   });
 });
 ownerOrdersRouter.patch("/chat-drafts/:id", async (req, res) => {
-  await repository.updateChatOrderDraft(
+  const storeId = await repository.updateChatOrderDraft(
     req.auth!.userId,
     idSchema.parse(req.params.id),
     updateChatOrderDraftSchema.parse(req.body),
   );
+  emitChatsChanged(storeId);
   res.sendStatus(204);
 });
 ownerOrdersRouter.delete("/chat-drafts/:id", async (req, res) => {
-  await repository.deleteChatOrderDraft(
+  const storeId = await repository.deleteChatOrderDraft(
     req.auth!.userId,
     idSchema.parse(req.params.id),
   );
+  emitChatsChanged(storeId);
   res.sendStatus(204);
 });
 ownerOrdersRouter.post("/chat-drafts/:id/confirm", async (req, res) => {
@@ -227,6 +285,7 @@ ownerOrdersRouter.post("/chat-drafts/:id/confirm", async (req, res) => {
     confirmChatOrderDraftSchema.parse(req.body),
   );
   emitOrdersChanged(result.storeId);
+  emitChatsChanged(result.storeId);
   res.status(201).json({ orderId: result.orderId });
 });
 ownerOrdersRouter.get("/", async (req, res) => {

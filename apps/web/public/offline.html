@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#244d35" />
+    <title>You're offline | PasaOrder</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background: #f8faf7;
+        color: #18251d;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+      main {
+        width: min(100%, 420px);
+        padding: 36px;
+        border: 1px solid #d6dfd6;
+        border-radius: 24px;
+        background: #fff;
+        text-align: center;
+      }
+      .mark {
+        display: grid;
+        place-items: center;
+        width: 64px;
+        height: 64px;
+        margin: 0 auto 24px;
+        border-radius: 18px;
+        background: #d6efa8;
+        color: #173d2c;
+        font-size: 32px;
+        font-weight: 800;
+        letter-spacing: -0.08em;
+      }
+      h1 {
+        margin: 0 0 12px;
+        font-size: 26px;
+        letter-spacing: -0.025em;
+      }
+      p {
+        margin: 0;
+        color: #59685d;
+        line-height: 1.5;
+      }
+      button {
+        margin-top: 28px;
+        padding: 12px 20px;
+        border: 0;
+        border-radius: 12px;
+        background: #244d35;
+        color: #fff;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:focus-visible {
+        outline: 3px solid #37794b;
+        outline-offset: 3px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="mark" aria-hidden="true">p.</div>
+      <h1>You're offline</h1>
+      <p>
+        Reconnect to view your store, place an order, or manage customer chats.
+      </p>
+      <button type="button" onclick="location.reload()">Try again</button>
+    </main>
+  </body>
+</html>

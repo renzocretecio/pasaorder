@@ -8,6 +8,7 @@ import {
   ChevronRight,
   ChevronUp,
   GripVertical,
+  FileUp,
   Layers,
   Package,
   Plus,
@@ -197,6 +198,16 @@ export function CatalogOrder({
                   <Link href={`${base}/categories/new`}>
                     <Layers aria-hidden="true" />
                     Add category
+                  </Link>
+                </Button>
+                <Button
+                  asChild
+                  variant="outline"
+                  className="h-12 rounded-xl bg-card"
+                >
+                  <Link href={`${base}/items/import`}>
+                    <FileUp aria-hidden="true" />
+                    Import
                   </Link>
                 </Button>
                 {categories.length > 0 && (

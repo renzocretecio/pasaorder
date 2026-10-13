@@ -15,7 +15,7 @@ export function metaWebhookVerifyToken() {
   return env.META_WEBHOOK_VERIFY_TOKEN ?? env.META_VERIFY_TOKEN;
 }
 
-export function metaMessengerConfigured() {
+export function metaIntegrationConfigured() {
   return Boolean(
     env.META_APP_ID &&
     env.META_APP_SECRET &&
@@ -26,8 +26,8 @@ export function metaMessengerConfigured() {
 }
 
 function requireMetaConfig() {
-  if (!metaMessengerConfigured())
-    throw new Error("Meta Messenger is not configured");
+  if (!metaIntegrationConfigured())
+    throw new Error("Meta integration is not configured");
   return {
     appId: env.META_APP_ID!,
     appSecret: env.META_APP_SECRET!,
@@ -36,11 +36,15 @@ function requireMetaConfig() {
   };
 }
 
-export function makeMetaLoginUrl(ownerId: string, storeId: string) {
+export function makeMetaLoginUrl(
+  ownerId: string,
+  storeId: string,
+  channel: MetaChannel = "MESSENGER",
+) {
   const { appId, redirectUri } = requireMetaConfig();
   const state = jwt.sign(
     {
-      purpose: "meta-messenger-connect",
+      purpose: `meta-${channel.toLowerCase()}-connect`,
       storeId,
       nonce: randomBytes(18).toString("hex"),
     },
@@ -59,7 +63,9 @@ export function makeMetaLoginUrl(ownerId: string, storeId: string) {
   url.searchParams.set("state", state);
   url.searchParams.set(
     "scope",
-    "pages_show_list,pages_manage_metadata,pages_messaging",
+    channel === "INSTAGRAM"
+      ? "pages_show_list,pages_manage_metadata,instagram_basic,instagram_manage_messages"
+      : "pages_show_list,pages_manage_metadata,pages_messaging",
   );
   url.searchParams.set("auth_type", "rerequest");
   return url.toString();
@@ -75,10 +81,18 @@ export function verifyMetaOAuthState(value: string) {
     typeof payload === "string" ||
     typeof payload.sub !== "string" ||
     typeof payload.storeId !== "string" ||
-    payload.purpose !== "meta-messenger-connect"
+    !["meta-messenger-connect", "meta-instagram-connect"].includes(
+      String(payload.purpose),
+    )
   )
     throw new Error("Invalid Meta OAuth state");
-  return { ownerId: payload.sub, storeId: payload.storeId };
+  const channel: MetaChannel =
+    payload.purpose === "meta-instagram-connect" ? "INSTAGRAM" : "MESSENGER";
+  return {
+    ownerId: payload.sub,
+    storeId: payload.storeId,
+    channel,
+  };
 }
 
 async function graphJson<T>(url: URL, init?: RequestInit): Promise<T> {
@@ -97,10 +111,15 @@ export type MetaPageCandidate = {
   id: string;
   name: string;
   encryptedPageAccessToken: string;
+  instagramId: string | null;
+  instagramUsername: string | null;
 };
+
+export type MetaChannel = "MESSENGER" | "INSTAGRAM";
 
 export async function exchangeMetaCode(
   code: string,
+  channel: MetaChannel = "MESSENGER",
 ): Promise<MetaPageCandidate[]> {
   const { appId, appSecret, redirectUri } = requireMetaConfig();
   const tokenUrl = new URL(`${GRAPH_BASE}/oauth/access_token`);
@@ -118,10 +137,20 @@ export async function exchangeMetaCode(
   const longToken = await graphJson<{ access_token: string }>(longTokenUrl);
 
   const pagesUrl = new URL(`${GRAPH_BASE}/me/accounts`);
-  pagesUrl.searchParams.set("fields", "id,name,access_token");
+  pagesUrl.searchParams.set(
+    "fields",
+    channel === "INSTAGRAM"
+      ? "id,name,access_token,instagram_business_account{id,username}"
+      : "id,name,access_token",
+  );
   pagesUrl.searchParams.set("limit", "100");
   const result = await graphJson<{
-    data: { id: string; name: string; access_token: string }[];
+    data: {
+      id: string;
+      name: string;
+      access_token: string;
+      instagram_business_account?: { id: string; username?: string } | null;
+    }[];
   }>(pagesUrl, {
     headers: { authorization: `Bearer ${longToken.access_token}` },
   });
@@ -131,6 +160,9 @@ export async function exchangeMetaCode(
       id: page.id,
       name: page.name,
       encryptedPageAccessToken: encryptMetaToken(page.access_token),
+      instagramId: page.instagram_business_account?.id ?? null,
+      instagramUsername:
+        page.instagram_business_account?.username?.replace(/^@/, "") ?? null,
     }));
 }
 
@@ -205,6 +237,24 @@ export async function unsubscribeMetaPage(pageId: string, token: string) {
   });
 }
 
+export async function sendInstagramText(
+  pageId: string,
+  recipientId: string,
+  text: string,
+  token: string,
+) {
+  const url = new URL(`${GRAPH_BASE}/${encodeURIComponent(pageId)}/messages`);
+  url.searchParams.set("platform", "instagram");
+  await graphJson<{ recipient_id: string; message_id: string }>(url, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ recipient: { id: recipientId }, message: { text } }),
+  });
+}
+
 export async function getMessengerCustomerName(
   senderId: string,
   token: string,
@@ -220,6 +270,18 @@ export async function getMessengerCustomerName(
     .join(" ")
     .trim()
     .slice(0, 120);
+}
+
+export async function getInstagramCustomerName(
+  senderId: string,
+  token: string,
+) {
+  const url = new URL(`${GRAPH_BASE}/${encodeURIComponent(senderId)}`);
+  url.searchParams.set("fields", "username");
+  const profile = await graphJson<{ username?: string }>(url, {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  return profile.username?.trim().replace(/^@/, "").slice(0, 120) ?? "";
 }
 
 export async function sendMessengerText(

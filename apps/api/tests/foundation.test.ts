@@ -23,23 +23,22 @@ process.env.DOTENV_CONFIG_PATH = "/dev/null";
 process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test";
 process.env.JWT_SECRET = "test-secret-only-for-tests-32-characters";
 process.env.WEB_ORIGIN = "http://localhost:3000";
-delete process.env.CLOUDFLARE_AI_ACCOUNT_ID;
-delete process.env.CLOUDFLARE_AI_API_TOKEN;
+delete process.env.INFERENCE_URL;
+delete process.env.INFERENCE_API_KEY;
 delete process.env.GEMINI_API_KEY;
 const { default: app } = await import("../src/app.js");
 const { pool } = await import("../src/db.js");
 const { signToken } = await import("../src/middleware/auth.js");
 const { prepareImage } =
   await import("../src/modules/images/images.service.js");
-const { parseClefResponse } =
-  await import("../src/modules/orders/clef.service.js");
 const {
   canExtractOrderCandidate,
+  currentChatDecision,
   chatInboxBucket,
   intentDecisionLog,
   routeChatDecision,
 } = await import("../src/modules/orders/decision-router.js");
-const { listChatOrderDrafts, savePublicChatDecision } =
+const { getChatOrderDraft, listChatOrderDrafts, savePublicChatDecision } =
   await import("../src/modules/orders/orders.repository.js");
 const { inquiryContext } =
   await import("../src/modules/orders/inquiry-context.js");
@@ -230,222 +229,46 @@ test("Gemini order extraction matches only exact available catalog items", () =>
     }),
   );
 });
-test("Clef-flash response is normalized and invalid choices are rejected", () => {
-  const probabilities = {
-    CREATE_ORDER: 0.66,
-    MODIFY_ORDER: 0.05,
-    CANCEL_ORDER: 0.02,
-    ORDER_STATUS: 0.02,
-    PRODUCT_INQUIRY: 0.12,
-    STORE_INQUIRY: 0.04,
-    PAYMENT_INQUIRY: 0.03,
-    GREETING: 0.03,
-    OTHER: 0.03,
-  };
-  const result = parseClefResponse({
-    success: true,
-    result: {
-      answers: {
-        intent: { choice: "CREATE_ORDER", confidence: 0.66, probabilities },
-        fulfillment: { choice: "pickup", confidence: 0.86 },
-        payment: { choice: "unspecified", confidence: 0.75 },
-        needs_clarification: { type: "noul", noul: 0.62 },
-        requires_llm: { type: "noul", noul: 0.94 },
-        requires_human: { type: "noul", noul: 0.2 },
-      },
-    },
-  });
-  assert.equal(result.model, "clef-flash");
-  assert.equal(result.intent.value, "CREATE_ORDER");
-  assert.equal(result.intent.probabilities?.PRODUCT_INQUIRY, 0.12);
-  assert.equal(result.fulfillment.value, "pickup");
-  assert.equal(result.needsClarificationProbability, 0.62);
-  assert.equal(result.requiresLLMProbability, 0.94);
-  assert.equal(routeChatDecision(result), "EXTRACT_ORDER");
-  assert.equal(canExtractOrderCandidate(result), true);
-  assert.equal(routeChatDecision(null), "EXTRACT_ORDER");
-  const nonOrder = {
-    ...result,
-    intent: {
-      value: "PRODUCT_INQUIRY" as const,
-      confidence: 0.9,
-      probabilities: {
-        ...probabilities,
-        CREATE_ORDER: 0.04,
-        PRODUCT_INQUIRY: 0.9,
-      },
-    },
-  };
-  assert.equal(routeChatDecision(nonOrder), "REVIEW_PRODUCT");
-  assert.equal(chatInboxBucket(result), "POSSIBLE_ORDER");
-  assert.equal(
-    chatInboxBucket({
-      ...result,
-      intent: {
-        value: "CREATE_ORDER",
-        confidence: 0.54,
-        probabilities: { CREATE_ORDER: 0.54, PRODUCT_INQUIRY: 0.07 },
-      },
-      needsClarificationProbability: 0.07,
-      requiresHumanProbability: 0.03,
-    }),
-    "POSSIBLE_ORDER",
-  );
-  assert.equal(chatInboxBucket(nonOrder), "NEEDS_ATTENTION");
-  assert.equal(canExtractOrderCandidate(nonOrder), false);
-  assert.equal(chatInboxBucket(null), "NEEDS_ATTENTION");
-  assert.equal(routeChatDecision(nonOrder, true), "EXTRACT_ORDER");
-  assert.deepEqual(intentDecisionLog("42", nonOrder), {
-    event: "chat_intent_routed",
-    draftId: "42",
-    model: "clef-flash",
-    intent: "PRODUCT_INQUIRY",
-    confidence: 0.9,
-    threshold: 0.65,
-    runnerUp: 0.05,
-    margin: 0.85,
-    marginThreshold: 0.2,
-    route: "REVIEW_PRODUCT",
-    needsClarification: false,
-    requiresLLM: true,
-    requiresHuman: false,
-  });
-  assert.equal(
-    routeChatDecision({
-      ...nonOrder,
-      intent: {
-        ...nonOrder.intent,
-        confidence: 0.46,
-        probabilities: {
-          ...nonOrder.intent.probabilities,
-          PRODUCT_INQUIRY: 0.46,
-          CREATE_ORDER: 0.42,
-        },
-      },
-    }),
-    "REVIEW_UNCLEAR",
-  );
-  const partialOrderDecision = {
-    ...result,
-    intent: {
-      value: "CREATE_ORDER" as const,
-      confidence: 0.45,
-      probabilities: { CREATE_ORDER: 0.45, PRODUCT_INQUIRY: 0.1 },
-    },
-  };
-  assert.equal(routeChatDecision(partialOrderDecision), "REVIEW_UNCLEAR");
-  assert.equal(chatInboxBucket(partialOrderDecision), "NEEDS_ATTENTION");
-  assert.equal(canExtractOrderCandidate(partialOrderDecision), true);
-  assert.equal(
-    canExtractOrderCandidate({
-      ...partialOrderDecision,
-      intent: {
-        ...partialOrderDecision.intent,
-        probabilities: { CREATE_ORDER: 0.45, PRODUCT_INQUIRY: 0.42 },
-      },
-    }),
-    true,
-  );
-  assert.throws(() =>
-    parseClefResponse({ success: false, result: { answers: {} } }),
-  );
-  assert.throws(() =>
-    parseClefResponse({
-      answers: {
-        intent: { choice: "approved", confidence: 0.99 },
-        fulfillment: { choice: "pickup", confidence: 0.86 },
-        payment: { choice: "cash", confidence: 0.9 },
-        needs_clarification: { type: "noul", noul: 0.2 },
-        requires_llm: { type: "noul", noul: 0.2 },
-        requires_human: { type: "noul", noul: 0.2 },
-      },
-    }),
-  );
-});
-test("nine intents route conservatively and never mutate an order", () => {
+test("ThinkLess buckets select review lanes without changing an order", () => {
   const base = {
-    model: "clef-flash" as const,
-    fulfillment: { value: "unspecified" as const, confidence: 0.9 },
-    payment: { value: "unspecified" as const, confidence: 0.9 },
-    needsClarificationProbability: 0.2,
-    requiresHumanProbability: 0.2,
+    model: "thinkless" as const,
+    policyVersion: 3 as const,
+    provider: "rules",
+    confidence: 1,
     analyzedAt: new Date().toISOString(),
   };
-  const cases = [
-    ["CREATE_ORDER", "EXTRACT_ORDER"],
-    ["MODIFY_ORDER", "REVIEW_MODIFICATION"],
-    ["CANCEL_ORDER", "REVIEW_CANCELLATION"],
-    ["ORDER_STATUS", "REVIEW_STATUS"],
-    ["PRODUCT_INQUIRY", "REVIEW_PRODUCT"],
-    ["STORE_INQUIRY", "REVIEW_STORE"],
-    ["PAYMENT_INQUIRY", "REVIEW_PAYMENT"],
-    ["GREETING", "REVIEW_GREETING"],
-    ["OTHER", "REVIEW_OTHER"],
-  ] as const;
-  for (const [value, expected] of cases) {
-    const decision = {
-      ...base,
-      intent: { value, confidence: 0.95 },
-    };
-    assert.equal(routeChatDecision(decision), expected, value);
-    assert.equal(
-      chatInboxBucket(decision),
-      value === "CREATE_ORDER"
-        ? "POSSIBLE_ORDER"
-        : value === "GREETING" || value === "OTHER"
-          ? "NORMAL"
-          : "NEEDS_ATTENTION",
-    );
-  }
+  const order = { ...base, bucket: "POSSIBLE_ORDER" as const };
+  const attention = { ...base, bucket: "NEEDS_ATTENTION" as const };
+  const normal = { ...base, bucket: "NORMAL" as const };
+  assert.equal(routeChatDecision(order), "EXTRACT_ORDER");
+  assert.equal(routeChatDecision(attention), "REVIEW_UNCLEAR");
+  assert.equal(routeChatDecision(normal), "REVIEW_OTHER");
+  assert.equal(routeChatDecision(normal, true), "EXTRACT_ORDER");
+  assert.equal(routeChatDecision(null), "EXTRACT_ORDER");
+  assert.equal(canExtractOrderCandidate(order), true);
+  assert.equal(canExtractOrderCandidate(attention), false);
+  assert.equal(chatInboxBucket(order), "POSSIBLE_ORDER");
+  assert.equal(chatInboxBucket(attention), "NEEDS_ATTENTION");
+  assert.equal(chatInboxBucket(normal), "NORMAL");
+  assert.equal(chatInboxBucket(null), "NEEDS_ATTENTION");
+  assert.deepEqual(intentDecisionLog("42", order), {
+    event: "chat_intent_routed",
+    draftId: "42",
+    model: "thinkless",
+    provider: "rules",
+    bucket: "POSSIBLE_ORDER",
+    confidence: 1,
+    threshold: 0.8,
+    route: "EXTRACT_ORDER",
+  });
+  assert.deepEqual(currentChatDecision(order), order);
+  assert.equal(currentChatDecision({ ...order, policyVersion: 2 }), null);
   assert.equal(
-    chatInboxBucket({
-      ...base,
-      intent: { value: "CREATE_ORDER", confidence: 0.95 },
-      needsClarificationProbability: 0.9,
-    }),
-    "NEEDS_ATTENTION",
+    currentChatDecision({ ...order, policyVersion: undefined }),
+    null,
   );
-  assert.equal(
-    chatInboxBucket({
-      ...base,
-      intent: { value: "OTHER", confidence: 0.95 },
-      requiresHumanProbability: 0.9,
-    }),
-    "NEEDS_ATTENTION",
-  );
-  assert.equal(
-    chatInboxBucket({
-      ...base,
-      intent: { value: "GREETING", confidence: 0.95 },
-      needsClarificationProbability: 0.9,
-    }),
-    "NORMAL",
-  );
-  assert.equal(
-    routeChatDecision({
-      ...base,
-      intent: { value: "CANCEL_ORDER", confidence: 0.89 },
-    }),
-    "REVIEW_CANCELLATION",
-  );
-  assert.equal(
-    routeChatDecision({
-      ...base,
-      intent: {
-        value: "CANCEL_ORDER",
-        confidence: 0.89,
-        probabilities: { CANCEL_ORDER: 0.89, OTHER: 0.11 },
-      },
-    }),
-    "REVIEW_UNCLEAR",
-  );
-  assert.equal(
-    routeChatDecision({
-      ...base,
-      intent: { value: "order_request", confidence: 0.95 },
-    }),
-    "EXTRACT_ORDER",
-  );
+  assert.equal(currentChatDecision({ model: "clef-flash", intent: {} }), null);
+  assert.equal(currentChatDecision({ ...order, bucket: "UNKNOWN" }), null);
 });
 test("inquiry context uses configured catalog facts without guessing products", () => {
   const catalog = {
@@ -500,37 +323,21 @@ test("inquiry context uses configured catalog facts without guessing products", 
   );
   assert.equal(inquiryContext("REVIEW_CANCELLATION", catalog, "Cancel"), null);
 });
-test("stale Clef results cannot replace the current conversation decision", async () => {
+test("stale classification cannot replace the current conversation decision", async () => {
   const previousQuery = pool.query;
-  const decision = parseClefResponse({
-    answers: {
-      intent: {
-        choice: "CREATE_ORDER",
-        confidence: 0.91,
-        probabilities: {
-          CREATE_ORDER: 0.91,
-          MODIFY_ORDER: 0.01,
-          CANCEL_ORDER: 0.01,
-          ORDER_STATUS: 0.01,
-          PRODUCT_INQUIRY: 0.02,
-          STORE_INQUIRY: 0.01,
-          PAYMENT_INQUIRY: 0.01,
-          GREETING: 0.01,
-          OTHER: 0.01,
-        },
-      },
-      fulfillment: { choice: "unspecified", confidence: 0.9 },
-      payment: { choice: "unspecified", confidence: 0.9 },
-      needs_clarification: { type: "noul", noul: 0.8 },
-      requires_llm: { type: "noul", noul: 0.9 },
-      requires_human: { type: "noul", noul: 0.3 },
-    },
-  });
+  const decision = {
+    model: "thinkless" as const,
+    policyVersion: 3 as const,
+    provider: "rules",
+    bucket: "POSSIBLE_ORDER" as const,
+    confidence: 1,
+    analyzedAt: new Date().toISOString(),
+  };
   pool.query = (async (sql: string, params: unknown[]) => {
     assert.equal(params[0], "42");
     assert.match(sql, /conversation_text = \$2/);
     assert.equal(params[1], "Customer: Hello");
-    return { rows: [] }; // The transcript changed while Clef was running.
+    return { rows: [] }; // The transcript changed while classification was running.
   }) as typeof pool.query;
   try {
     assert.equal(
@@ -544,12 +351,11 @@ test("stale Clef results cannot replace the current conversation decision", asyn
 test("the inbox groups chats by their latest decision", async () => {
   const previousQuery = pool.query;
   const decision = {
-    model: "clef-flash" as const,
-    intent: { value: "CREATE_ORDER" as const, confidence: 0.95 },
-    fulfillment: { value: "unspecified" as const, confidence: 0.8 },
-    payment: { value: "unspecified" as const, confidence: 0.8 },
-    needsClarificationProbability: 0.2,
-    requiresHumanProbability: 0.2,
+    model: "thinkless" as const,
+    policyVersion: 3 as const,
+    provider: "rules",
+    bucket: "POSSIBLE_ORDER" as const,
+    confidence: 1,
     analyzedAt: new Date().toISOString(),
   };
   pool.query = (async (sql: string, params: unknown[]) => {
@@ -575,8 +381,14 @@ test("the inbox groups chats by their latest decision", async () => {
           latestMessage: "Cancel ko na",
           decision: {
             ...decision,
-            intent: { value: "CANCEL_ORDER", confidence: 0.95 },
+            bucket: "NEEDS_ATTENTION",
           },
+        },
+        {
+          ...row,
+          id: "3",
+          latestMessage: "Earlier conversation",
+          decision: { model: "clef-flash", intent: { value: "CREATE_ORDER" } },
         },
       ],
     };
@@ -591,8 +403,36 @@ test("the inbox groups chats by their latest decision", async () => {
       [
         ["POSSIBLE_ORDER", "Pa-order po"],
         ["NEEDS_ATTENTION", "Cancel ko na"],
+        ["NEEDS_ATTENTION", "Earlier conversation"],
       ],
     );
+    assert.equal(drafts[2].decision, null);
+  } finally {
+    pool.query = previousQuery;
+  }
+});
+test("opening a draft ignores an older stored decision and keeps the conversation", async () => {
+  const previousQuery = pool.query;
+  pool.query = (async () => ({
+    rows: [
+      {
+        id: "42",
+        storeId: "9",
+        source: "WEB_CHAT",
+        conversationText: "Customer: Pa-order dalawang burger",
+        draftData: {},
+        decision: { model: "clef-flash", intent: { value: "CREATE_ORDER" } },
+        status: "DRAFT",
+        orderId: null,
+        createdAt: new Date("2026-01-01"),
+        updatedAt: new Date("2026-01-02"),
+      },
+    ],
+  })) as unknown as typeof pool.query;
+  try {
+    const draft = await getChatOrderDraft("7", "42");
+    assert.equal(draft.decision, null);
+    assert.equal(draft.conversationText, "Customer: Pa-order dalawang burger");
   } finally {
     pool.query = previousQuery;
   }

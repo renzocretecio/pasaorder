@@ -31,11 +31,10 @@ export default async function ChatOrderDraftPage({
   return (
     <>
       <PageHeading
-        eyebrow={`${store.name} / Chat orders`}
         title="Review chat"
-        description="Read the conversation, then prepare and confirm an order if the customer is ready."
+        description={`${store.name} · Read the conversation, then prepare and confirm an order if the customer is ready.`}
       />
-      <div className="mx-auto max-w-3xl rounded-2xl border bg-card p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-6xl">
         <ChatDraftEditor
           key={draftId}
           draft={result.draft}

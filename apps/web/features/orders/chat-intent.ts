@@ -18,7 +18,7 @@ export const chatRouteAdvice: Record<
     "Check this store’s enabled payment methods. Share only customer-facing payment instructions.",
   REVIEW_GREETING: "A simple greeting can be handled without order extraction.",
   REVIEW_OTHER:
-    "The request does not match an order flow. Ask a clarifying question or handle it manually.",
+    "This looks like an acknowledgement. Read the conversation and reply if needed.",
   REVIEW_UNCLEAR:
-    "The intent is uncertain. Read the conversation and ask for clarification before taking action.",
+    "This chat needs your attention. Answer the customer's question or clarify the request before taking action.",
 };

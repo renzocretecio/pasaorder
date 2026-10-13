@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
     useTypeScriptCli: false,
     serverActions: { bodySizeLimit: "6mb" },
   },
+  devIndicators: false,
 };
 
 export default nextConfig;

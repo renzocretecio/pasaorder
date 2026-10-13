@@ -9,21 +9,18 @@ import type {
   PaymentInstructions,
   PaymentMethod,
   PaymentStatus,
-  Product,
-  ProductVariant,
 } from "@pasaorder/types";
 import { Button } from "@/components/ui/button";
 import { CatalogImage } from "./catalog-image";
 import { orderTypes } from "@pasaorder/types";
 import { peso } from "./color";
 
-type CartLine = {
-  key: string;
-  item: Product;
-  variant: ProductVariant | null;
-  quantity: number;
-  instructions: string;
-};
+import {
+  checkoutRequestKey,
+  clearCheckoutRequest,
+  deviceStorage,
+  type CartLine,
+} from "./saved-cart";
 
 type PlacedOrder = {
   id: string;
@@ -146,6 +143,9 @@ function cents(value: string) {
 }
 
 export function CartCheckout({
+  online,
+  refreshing,
+  persistCheckout,
   open,
   onOpenChange,
   storeSlug,
@@ -158,6 +158,9 @@ export function CartCheckout({
   orderType,
   setOrderType,
 }: {
+  online: boolean;
+  refreshing: boolean;
+  persistCheckout: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   storeSlug: string;
@@ -218,7 +221,7 @@ export function CartCheckout({
       current
         .map((line) =>
           line.key === key
-            ? { ...line, quantity: line.quantity + amount }
+            ? { ...line, quantity: Math.min(100, line.quantity + amount) }
             : line,
         )
         .filter((line) => line.quantity > 0),
@@ -227,10 +230,17 @@ export function CartCheckout({
 
   async function submitOrder(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (pending || !cart.length) return;
+    if (pending || !cart.length || refreshing) return;
+    if (!online || !navigator.onLine) {
+      setError(
+        "You’re offline. Reconnect, then place your order. Your cart stays here.",
+      );
+      return;
+    }
     setPending(true);
     setError("");
-    const requestKey = idempotencyKey ?? crypto.randomUUID();
+    const storage = persistCheckout ? deviceStorage() : null;
+    const requestKey = checkoutRequestKey(storeSlug, idempotencyKey, storage);
     setIdempotencyKey(requestKey);
     try {
       const response = await fetch("/api/orders", {
@@ -259,19 +269,37 @@ export function CartCheckout({
         }),
       });
       const body = await response.json().catch(() => null);
-      if (!response.ok)
+      if (!response.ok) {
+        // A definite client rejection can be corrected with a new attempt.
+        // Network/server failures keep the key because the order may exist.
+        if (
+          response.status >= 400 &&
+          response.status < 500 &&
+          response.status !== 408
+        ) {
+          clearCheckoutRequest(storeSlug, storage);
+          setIdempotencyKey(null);
+        }
         throw new Error(
           body?.message ?? "We couldn’t place your order. Please try again.",
+        );
+      }
+      if (!body?.order?.trackingToken)
+        throw new Error(
+          "We couldn’t confirm the result. Please retry to check your order.",
         );
       setPlacedOrder(body.order as PlacedOrder);
       setCart([]);
       setIdempotencyKey(null);
+      clearCheckoutRequest(storeSlug, storage);
       setStep("placed");
     } catch (submitError) {
       setError(
-        submitError instanceof Error
-          ? submitError.message
-          : "We couldn’t place your order. Please try again.",
+        submitError instanceof TypeError
+          ? "Connection interrupted. Your cart is still here. Reconnect and retry; the same attempt will be checked to avoid a duplicate order."
+          : submitError instanceof Error
+            ? submitError.message
+            : "We couldn’t place your order. Please try again.",
       );
     } finally {
       setPending(false);
@@ -286,6 +314,16 @@ export function CartCheckout({
           style={accentStyle}
           className="fixed inset-x-3 top-1/2 z-50 mx-auto flex max-h-[min(44rem,calc(100dvh-1.5rem))] w-[calc(100%-1.5rem)] max-w-lg -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-[#d6dfd6] bg-white text-[#18251d] shadow-xl outline-none"
         >
+          {(!online || refreshing) && step !== "placed" && (
+            <p
+              role="status"
+              className="border-b border-[#d6dfd6] bg-[#f6f5ef] px-5 py-3 text-sm text-[#59685d]"
+            >
+              {!online
+                ? "You’re offline. Keep editing your cart and reconnect before placing your order."
+                : "Refreshing the menu after reconnecting…"}
+            </p>
+          )}
           {step === "placed" && placedOrder ? (
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-10 text-center">
               <div className="grid size-14 place-items-center rounded-full bg-[var(--store-accent-soft)] text-[var(--store-accent-ink)]">
@@ -555,10 +593,16 @@ export function CartCheckout({
               <div className="border-t border-[#d6dfd6] px-5 py-4">
                 <Button
                   type="submit"
-                  disabled={pending || !cart.length}
+                  disabled={pending || !cart.length || !online || refreshing}
                   className="h-12 w-full rounded-xl text-base"
                 >
-                  {pending ? "Placing order…" : `Place order · ${subtotal}`}
+                  {pending
+                    ? "Placing order…"
+                    : !online
+                      ? "Reconnect to place order"
+                      : refreshing
+                        ? "Refreshing menu…"
+                        : `Place order · ${subtotal}`}
                 </Button>
                 <p className="mt-2 text-center text-xs text-[#59685d]">
                   No account needed. The store will contact you to confirm.

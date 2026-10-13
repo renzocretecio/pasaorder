@@ -2,8 +2,25 @@ import Link from "next/link";
 import { AuthForm } from "@/components/auth/auth-form";
 import { Brand } from "@/components/brand";
 import { StorefrontIllustration } from "@/components/auth/storefront-illustration";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
-export function AuthPageShell({ mode }: { mode: "login" | "register" }) {
+const oauthErrors: Record<string, string> = {
+  cancelled: "Google sign-in was cancelled. You can try again or use email.",
+  conflict:
+    "This email already has a PasaOrder account. Sign in with your existing method.",
+  failed: "We couldn’t complete Google sign-in. Please try again.",
+  state: "Your Google sign-in session expired. Please try again.",
+};
+
+export function AuthPageShell({
+  mode,
+  googleEnabled = false,
+  oauthError,
+}: {
+  mode: "login" | "register";
+  googleEnabled?: boolean;
+  oauthError?: string;
+}) {
   const signingUp = mode === "register";
   return (
     <main
@@ -32,7 +49,12 @@ export function AuthPageShell({ mode }: { mode: "login" | "register" }) {
                   ? "A home for your business starts with you. Create your owner account to get started."
                   : "Sign in to your PasaOrder workspace. Pick up where you left off."}
               </p>
-              <AuthForm mode={mode} />
+              {oauthError && oauthErrors[oauthError] && (
+                <Alert variant="destructive" className="mt-6">
+                  <AlertDescription>{oauthErrors[oauthError]}</AlertDescription>
+                </Alert>
+              )}
+              <AuthForm mode={mode} googleEnabled={googleEnabled} />
             </div>
           </div>
           <footer className="mx-auto w-full max-w-[390px] border-t border-primary/15 pt-5 text-[13px] leading-[1.4] text-muted-foreground">

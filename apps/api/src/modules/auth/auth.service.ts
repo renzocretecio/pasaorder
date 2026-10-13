@@ -39,7 +39,8 @@ export async function loginUser(input: unknown) {
     parsed.password,
     user?.passwordHash ?? (await dummyPasswordHash),
   );
-  if (!user || !passwordMatches) throw new AppError(401, "Invalid credentials");
+  if (!user || !user.passwordHash || !passwordMatches)
+    throw new AppError(401, "Invalid credentials");
   return {
     user: {
       id: user.id,

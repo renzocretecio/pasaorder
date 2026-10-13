@@ -7,6 +7,7 @@ import type {
   ProductVariant,
   WorkspaceStore,
 } from "@pasaorder/types";
+import type { CatalogImportInput } from "@pasaorder/validation";
 import { pool } from "../../db.js";
 import { AppError } from "../../middleware/errors.js";
 const storeFields = `s.id, s.name, s.slug, s.description, s.contact_phone AS "contactPhone", s.address, s.operating_hours AS "operatingHours", s.order_types AS "orderTypes", s.payment_methods AS "paymentMethods", s.gcash_account_name AS "gcashAccountName", s.gcash_number AS "gcashNumber", s.gcash_qr_url AS "gcashQrUrl", s.logo_url AS "logoUrl", s.banner_url AS "bannerUrl", s.is_active AS "isActive", s.is_published AS "isPublished", s.accent_color AS "accentColor"`;
@@ -39,7 +40,7 @@ export async function ownedStore(
 export async function listCatalogStores(ownerId: string) {
   return (
     await pool.query<WorkspaceStore>(
-      `SELECT ${storeFields}, COALESCE(op.default_store_id, (SELECT preferred.id FROM stores preferred WHERE preferred.owner_id = s.owner_id ORDER BY preferred.created_at DESC, preferred.id DESC LIMIT 1)) = s.id AS "isDefault" FROM stores s LEFT JOIN owner_preferences op ON op.owner_id = s.owner_id WHERE s.owner_id = $1 ORDER BY s.created_at DESC, s.id DESC`,
+      `SELECT ${storeFields}, COALESCE(op.default_store_id, (SELECT preferred.id FROM stores preferred WHERE preferred.owner_id = s.owner_id ORDER BY preferred.created_at DESC, preferred.id DESC LIMIT 1)) = s.id AS "isDefault", (SELECT count(*)::int FROM chat_order_drafts d WHERE d.store_id = s.id AND d.status = 'DRAFT' AND (d.source <> 'WEB_CHAT' OR d.chat_messages <> '[]'::jsonb) AND NOT COALESCE(d.decision @> '{"model":"thinkless","policyVersion":3,"bucket":"NORMAL"}'::jsonb, false)) AS "actionableChatCount" FROM stores s LEFT JOIN owner_preferences op ON op.owner_id = s.owner_id WHERE s.owner_id = $1 ORDER BY s.created_at DESC, s.id DESC`,
       [ownerId],
     )
   ).rows;
@@ -203,6 +204,98 @@ export type ItemInput = {
   isAvailable: boolean;
   sortOrder: number;
 };
+export async function importItems(
+  storeId: string,
+  input: CatalogImportInput,
+  ownerId: string,
+) {
+  return transaction(async (client) => {
+    await ownedStore(client, storeId, ownerId);
+    const existingCategories = await client.query<{
+      id: string;
+      name: string;
+      sortOrder: number;
+      nextItemOrder: number;
+    }>(
+      `SELECT c.id, c.name, c.sort_order AS "sortOrder", COALESCE(MAX(p.sort_order), -1)::int + 1 AS "nextItemOrder"
+       FROM categories c LEFT JOIN products p ON p.category_id = c.id
+       WHERE c.store_id = $1 GROUP BY c.id ORDER BY c.sort_order, c.id`,
+      [storeId],
+    );
+    const categoryKey = (value: string) => value.trim().toLocaleLowerCase();
+    const productKey = (category: string, name: string) =>
+      JSON.stringify([categoryKey(category), name.trim().toLocaleLowerCase()]);
+    const categories = new Map(
+      existingCategories.rows.map((category) => [
+        categoryKey(category.name),
+        category,
+      ]),
+    );
+    const existingProducts = await client.query<{
+      category: string;
+      name: string;
+    }>(
+      `SELECT c.name AS category, p.name FROM products p JOIN categories c ON c.id = p.category_id WHERE c.store_id = $1`,
+      [storeId],
+    );
+    const names = new Set(
+      existingProducts.rows.map((item) => productKey(item.category, item.name)),
+    );
+    for (const item of input.items) {
+      const key = productKey(item.category, item.name);
+      if (names.has(key))
+        throw new AppError(
+          409,
+          `Row ${item.row}: ${item.name} already exists in ${item.category}.`,
+        );
+      names.add(key);
+    }
+    let nextCategoryOrder = Math.max(
+      0,
+      ...existingCategories.rows.map((category) => category.sortOrder + 1),
+    );
+    let createdCategories = 0;
+    for (const item of input.items) {
+      const key = categoryKey(item.category);
+      let category = categories.get(key);
+      if (!category) {
+        const result = await client.query<{ id: string }>(
+          "INSERT INTO categories (store_id,name,sort_order) VALUES ($1,$2,$3) RETURNING id",
+          [storeId, item.category, nextCategoryOrder],
+        );
+        category = {
+          id: result.rows[0].id,
+          name: item.category,
+          sortOrder: nextCategoryOrder++,
+          nextItemOrder: 0,
+        };
+        categories.set(key, category);
+        createdCategories++;
+      }
+      const price = item.variants.length
+        ? item.variants.reduce(
+            (lowest, variant) =>
+              Number(variant.price) < Number(lowest) ? variant.price : lowest,
+            item.variants[0].price,
+          )
+        : item.price!;
+      const result = await client.query<{ id: string }>(
+        `INSERT INTO products (category_id,name,description,price,image_url,is_available,sort_order)
+         VALUES ($1,$2,$3,$4,NULL,$5,$6) RETURNING id`,
+        [
+          category.id,
+          item.name,
+          item.description || null,
+          price,
+          item.isAvailable,
+          category.nextItemOrder++,
+        ],
+      );
+      await saveVariants(client, result.rows[0].id, item.variants, false);
+    }
+    return { imported: input.items.length, createdCategories };
+  });
+}
 export async function saveItem(
   id: string,
   itemId: string | undefined,

@@ -9,6 +9,7 @@ const app = express();
 app.disable("x-powered-by");
 app.use(helmet());
 app.use(cors({ origin: env.WEB_ORIGIN }));
+app.use("/api/catalog/stores/:id/items/import", express.json({ limit: "8mb" }));
 app.use(
   express.json({
     limit: "100kb",

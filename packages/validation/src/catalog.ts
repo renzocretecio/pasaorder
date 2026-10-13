@@ -188,6 +188,55 @@ export const catalogItemSchema = z
       labels.add(label);
     }
   });
+export const MIN_CATALOG_IMPORT_ITEMS = 5;
+// Technical ceiling for workbook parsing and API validation, not a store plan limit.
+export const MAX_CATALOG_IMPORT_ITEMS = 9999;
+export const catalogImportSchema = z
+  .object({
+    items: z
+      .array(
+        z
+          .object({
+            row: z.number().int().min(2).max(10000),
+            category: z.string().trim().min(2).max(120),
+            name: z.string().trim().min(2).max(120),
+            description: optionalText(1000),
+            price: priceSchema.optional(),
+            variants: z.array(variantSchema.omit({ id: true })).max(20),
+            isAvailable: z.boolean(),
+          })
+          .strict()
+          .superRefine((item, context) => {
+            if (item.variants.length === 0 && !item.price)
+              context.addIssue({
+                code: "custom",
+                path: ["price"],
+                message: "Enter a price or options",
+              });
+            if (item.variants.length > 0 && item.price)
+              context.addIssue({
+                code: "custom",
+                path: ["price"],
+                message: "Leave Price blank when using Options",
+              });
+            const labels = new Set<string>();
+            for (const [index, variant] of item.variants.entries()) {
+              const key = variant.label.toLocaleLowerCase();
+              if (labels.has(key))
+                context.addIssue({
+                  code: "custom",
+                  path: ["variants", index, "label"],
+                  message: "Duplicate option",
+                });
+              labels.add(key);
+            }
+          }),
+      )
+      .min(MIN_CATALOG_IMPORT_ITEMS)
+      .max(MAX_CATALOG_IMPORT_ITEMS),
+  })
+  .strict();
+export type CatalogImportInput = z.infer<typeof catalogImportSchema>;
 export const publicationSchema = z
   .object({ isPublished: z.boolean() })
   .strict();

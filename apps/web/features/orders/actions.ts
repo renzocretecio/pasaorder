@@ -8,6 +8,37 @@ import {
 } from "@pasaorder/validation";
 import { ApiError, requireUser } from "@/lib/auth";
 import { ownerApi } from "@/lib/catalog";
+import type { PastOrdersPage } from "@pasaorder/types";
+
+export async function loadPastOrdersPage(
+  storeId: string,
+  cursor: string | null,
+  payment: "ALL" | "UNPAID",
+) {
+  await requireUser();
+  if (
+    !idSchema.safeParse(storeId).success ||
+    (cursor !== null && (typeof cursor !== "string" || cursor.length > 256)) ||
+    (payment !== "ALL" && payment !== "UNPAID")
+  )
+    return { success: false as const, message: "Invalid history request." };
+  const params = new URLSearchParams({ payment });
+  if (cursor) params.set("cursor", cursor);
+  try {
+    const page = await ownerApi<PastOrdersPage>(
+      `/orders/stores/${storeId}/history?${params}`,
+    );
+    return { success: true as const, page };
+  } catch (error) {
+    return {
+      success: false as const,
+      message:
+        error instanceof ApiError
+          ? error.message
+          : "Couldn’t load past orders. Please try again.",
+    };
+  }
+}
 
 export async function updateOrderStatus(
   orderId: string,

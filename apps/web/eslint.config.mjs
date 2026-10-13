@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Registry chart sources ship with their own lint conventions.
+    "components/charts/**",
   ]),
 ]);
 

@@ -199,6 +199,16 @@ Authentication uses:
 
 Authentication is currently the most developed visual reference for PasaOrder's warm brand identity.
 
+## Public landing page
+
+**Status: Established**
+
+The public home page presents PasaOrder as an order management tool for small Filipino stores. Its headline is “Orders made simple, from chat to checkout.” The page uses the existing Geist typeface, forest green, soft lime, and warm neutral foundation. A warm light opening pairs a large left-aligned headline with compact supporting copy and actions. Wide neighborhood-store photography, a forest-green handoff strip, and a lime-backed interactive example give the page its identity. The primary action leads to account creation. A sticky header keeps sign-in reachable on mobile.
+
+The landing page’s focal motion is a visitor-controlled Messenger → owner review → confirmed order walkthrough. Its play sequence is finite, pauses offscreen, and stops when the document is hidden. Reduced-motion preferences remove spatial transitions and playback while preserving manual stage controls. Section reveals run once, retain visible HTML before JavaScript, and cancel when reduced motion is enabled. CTA arrows provide small directional feedback; avoid perpetual decorative loops.
+
+Marketing copy must distinguish current QR/link checkout and owner-reviewed Facebook Messenger order drafts from planned capabilities. Demonstrations are explicitly illustrative; do not invent testimonials, metrics, prices, or automatic payment confirmation. Keep the page readable on phones and tablets, with the handoff path stacking vertically on narrow screens.
+
 ## Business Dashboard
 
 **Status: Light default**
@@ -206,6 +216,8 @@ Authentication is currently the most developed visual reference for PasaOrder's 
 The owner workspace uses light backgrounds, white surfaces, forest green actions, and muted green secondary surfaces. Light is the default for now, including when the device prefers dark mode.
 
 New dashboard pages should use the shared semantic theme tokens. A dark palette remains available in CSS through the opt-in `.merchant-theme.dark` selector; no theme toggle is implemented.
+
+Workspace pages use a direct page title with supporting copy beneath it. Put the selected store name and other page context in that supporting line, and align page actions beside the title on wider screens and below it on narrow screens. Avoid repeating a small eyebrow label above every workspace title.
 
 Do not automatically redesign unrelated existing dashboard screens while working on a scoped task.
 
@@ -429,6 +441,8 @@ The owner workspace starts with a compact header on phones, an account disclosur
 At 768px and above, replace the bottom navigation with an 88px rail. Show the full 216px sidebar from 1280px. Keep portrait and landscape iPad layouts usable; a tablet should not inherit a wide desktop sidebar.
 
 The publish panel precedes catalog items on narrow screens and becomes a contextual side panel from 1024px. Sharing controls and the setup checklist use a disclosure to keep the main task in view. Published catalogs keep visibility controls inside the sharing section, while draft catalogs expose the publish action. Category/item actions stay reachable under the compact header while browsing.
+
+Chat order review stacks the conversation before order details on phones. From tablet width, use a 60/40 split with editable order details on the left and the conversation and review guidance on the right. Keep item controls readable within the narrower order column.
 
 Dashboard content should be information-dense without feeling crowded.
 
@@ -801,6 +815,8 @@ Order interfaces should prioritize:
 - Immediate next action.
 
 Status changes should be obvious and quick.
+
+New-order cards stay compact, with View order and Confirm order actions together. View order opens the full review in a dialog, presented as a bottom sheet on phones. Delivery confirmation opens the dialog so the owner can set the required fee.
 
 Do not make owners navigate through unnecessary layers to perform common order actions.
 

@@ -32,19 +32,6 @@ export type ChatOrderDraftData = {
     specialInstructions?: string;
   }[];
 };
-export const chatIntents = [
-  "CREATE_ORDER",
-  "MODIFY_ORDER",
-  "CANCEL_ORDER",
-  "ORDER_STATUS",
-  "PRODUCT_INQUIRY",
-  "STORE_INQUIRY",
-  "PAYMENT_INQUIRY",
-  "GREETING",
-  "OTHER",
-] as const;
-export type ChatIntent = (typeof chatIntents)[number];
-export type LegacyChatIntent = "order_request" | "question" | "other";
 export type ChatRoute =
   | "EXTRACT_ORDER"
   | "REVIEW_MODIFICATION"
@@ -57,22 +44,11 @@ export type ChatRoute =
   | "REVIEW_OTHER"
   | "REVIEW_UNCLEAR";
 export type ChatDecision = {
-  model: "clef-flash";
-  intent: {
-    value: ChatIntent | LegacyChatIntent;
-    confidence: number;
-    probabilities?: Partial<Record<ChatIntent, number>>;
-  };
-  fulfillment: {
-    value: "dine_in" | "pickup" | "delivery" | "unspecified";
-    confidence: number;
-  };
-  payment: { value: "cash" | "gcash" | "unspecified"; confidence: number };
-  needsClarificationProbability?: number;
-  requiresLLMProbability?: number;
-  requiresHumanProbability?: number;
-  /** Older stored Clef decisions used this field. */
-  missingDetailsProbability?: number;
+  model: "thinkless";
+  policyVersion: 3;
+  provider: string;
+  bucket: "POSSIBLE_ORDER" | "NEEDS_ATTENTION" | "NORMAL";
+  confidence: number;
   analyzedAt: string;
 };
 export type ChatExtractionReview = {
@@ -171,4 +147,29 @@ export type OwnerOrder = Pick<
   storeName: string;
   subtotal: string;
   items: OrderItem[];
+};
+
+export type PastOrdersPage = {
+  orders: OwnerOrder[];
+  nextCursor: string | null;
+  totalCount: number;
+  unpaidCount: number;
+};
+
+export type StoreOverview = {
+  generatedAt: string;
+  date: string;
+  from: string;
+  to: string;
+  sales: string;
+  ordersCount: number;
+  activeOrders: number;
+  awaitingConfirmation: number;
+  salesTrend: { date: string; sales: string }[];
+  topProducts: {
+    productId: string;
+    name: string;
+    units: number;
+    revenue: string;
+  }[];
 };

@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
+import { io } from "socket.io-client";
 import {
   ChevronDown,
+  LayoutDashboard,
   MessageSquareText,
   Plus,
   ShoppingBag,
@@ -33,14 +35,18 @@ export function WorkspaceNavigation({
   const creating = pathname === "/dashboard/new";
   const orders = pathname.endsWith("/orders");
   const chatOrders = pathname.includes("/chat-orders");
+  const overview = pathname.endsWith("/overview");
   const routeStoreId = pathname.match(/^\/dashboard\/stores\/([^/]+)/)?.[1];
   const selectedStore =
     stores.find((store) => store.id === routeStoreId) ??
     stores.find((store) => store.isDefault);
+  const selectedStoreId = selectedStore?.id;
+  const actionableChatCount = selectedStore?.actionableChatCount ?? 0;
   const catalogHref = selectedStore
     ? `/dashboard/stores/${selectedStore.id}`
     : "/dashboard";
   const ordersHref = selectedStore ? `${catalogHref}/orders` : "/dashboard";
+  const overviewHref = selectedStore ? `${catalogHref}/overview` : "/dashboard";
 
   useEffect(() => {
     function close(event: PointerEvent) {
@@ -69,6 +75,65 @@ export function WorkspaceNavigation({
     };
   }, []);
 
+  useEffect(() => {
+    if (!selectedStoreId) return;
+    let reconnectTimer: number | undefined;
+    const socket = io(
+      process.env.NEXT_PUBLIC_SOCKET_URL ?? "http://localhost:4000",
+      {
+        auth: (callback) => {
+          fetch("/api/socket-token", { cache: "no-store" })
+            .then(async (response) => {
+              if (!response.ok)
+                throw new Error("Unable to authenticate live updates");
+              return response.json() as Promise<{ token: string }>;
+            })
+            .then(({ token }) => callback({ token }))
+            .catch(() => callback({ token: "" }));
+        },
+        autoConnect: false,
+      },
+    );
+    socket.on("connect", () => {
+      socket.emit(
+        "store:join",
+        { storeId: selectedStoreId },
+        ({ ok }: { ok: boolean }) => {
+          if (ok) router.refresh();
+        },
+      );
+    });
+    socket.on("chats:changed", (event: { storeId?: string }) => {
+      if (
+        event.storeId === selectedStoreId &&
+        document.visibilityState === "visible"
+      )
+        router.refresh();
+    });
+    socket.on("orders:changed", (event: { storeId?: string }) => {
+      if (
+        overview &&
+        event.storeId === selectedStoreId &&
+        document.visibilityState === "visible"
+      )
+        router.refresh();
+    });
+    socket.on("disconnect", (reason) => {
+      if (reason === "io server disconnect")
+        reconnectTimer = window.setTimeout(() => socket.connect(), 0);
+    });
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") router.refresh();
+    };
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    socket.connect();
+    return () => {
+      window.clearTimeout(reconnectTimer);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      socket.disconnect();
+    };
+  }, [overview, router, selectedStoreId]);
+
   function chooseDefault(storeId: string) {
     setMessage("");
     startTransition(async () => {
@@ -80,22 +145,37 @@ export function WorkspaceNavigation({
 
   const links = [
     {
+      href: overviewHref,
+      label: "Overview",
+      icon: LayoutDashboard,
+      active: Boolean(selectedStore) && overview,
+      count: 0,
+    },
+    {
       href: catalogHref,
       label: "Catalog",
       icon: Store,
-      active: Boolean(selectedStore) && !creating && !orders && !chatOrders,
+      active:
+        Boolean(selectedStore) &&
+        !creating &&
+        !orders &&
+        !chatOrders &&
+        !overview,
+      count: 0,
     },
     {
       href: ordersHref,
       label: "Orders",
       icon: ShoppingBag,
       active: Boolean(selectedStore) && orders,
+      count: 0,
     },
     {
       href: selectedStore ? `${catalogHref}/chat-orders` : "/dashboard",
       label: "Chats",
       icon: MessageSquareText,
       active: Boolean(selectedStore) && chatOrders,
+      count: actionableChatCount,
     },
   ];
 
@@ -103,7 +183,7 @@ export function WorkspaceNavigation({
     <>
       <aside className="sticky top-0 row-span-2 hidden h-dvh flex-col border-r bg-card px-3 py-6 md:flex xl:px-5">
         <Link
-          href={catalogHref}
+          href={overviewHref}
           aria-label="PasaOrder workspace"
           className="mx-auto flex min-h-11 items-center gap-3 xl:mx-0 xl:px-2"
         >
@@ -121,11 +201,16 @@ export function WorkspaceNavigation({
           {selectedStore?.name ?? "Workspace"}
         </p>
         <nav aria-label="Store workspace" className="mt-8 space-y-2 xl:mt-0">
-          {links.map(({ href, label, icon: Icon, active }) => (
+          {links.map(({ href, label, icon: Icon, active, count }) => (
             <Link
               key={label}
               href={href}
               aria-current={active ? "location" : undefined}
+              aria-label={
+                count
+                  ? `${label}, ${count} ${count === 1 ? "conversation" : "conversations"} need review`
+                  : undefined
+              }
               className={cn(
                 "flex min-h-16 flex-col items-center justify-center gap-1 rounded-xl px-2 text-xs transition-colors xl:min-h-12 xl:flex-row xl:justify-start xl:gap-3 xl:px-3 xl:text-sm",
                 active
@@ -133,8 +218,26 @@ export function WorkspaceNavigation({
                   : "text-muted-foreground hover:bg-muted hover:text-foreground",
               )}
             >
-              <Icon className="size-5" aria-hidden="true" />
+              <span className="relative grid size-5 shrink-0 place-items-center">
+                <Icon className="size-5" aria-hidden="true" />
+                {count > 0 && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute -top-2 -right-3 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-700 px-1 text-[10px] font-bold leading-none tabular-nums text-primary-foreground xl:hidden"
+                  >
+                    {count > 99 ? "99+" : count}
+                  </span>
+                )}
+              </span>
               {label}
+              {count > 0 && (
+                <span
+                  aria-hidden="true"
+                  className="ml-auto hidden h-6 min-w-6 items-center justify-center rounded-full bg-red-700 px-1.5 text-xs font-semibold tabular-nums text-primary-foreground xl:inline-flex"
+                >
+                  {count > 99 ? "99+" : count}
+                </span>
+              )}
             </Link>
           ))}
         </nav>
@@ -176,7 +279,7 @@ export function WorkspaceNavigation({
                   className="flex items-center gap-2 rounded-xl px-2 hover:bg-muted"
                 >
                   <Link
-                    href={`/dashboard/stores/${store.id}`}
+                    href={`/dashboard/stores/${store.id}/overview`}
                     onClick={() => {
                       if (storeMenu.current) storeMenu.current.open = false;
                     }}
@@ -259,13 +362,18 @@ export function WorkspaceNavigation({
       </header>
       <nav
         aria-label="Store workspace"
-        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-3 border-t bg-card pt-2 pl-[max(1.25rem,env(safe-area-inset-left))] pr-[max(1.25rem,env(safe-area-inset-right))] pb-[max(.5rem,env(safe-area-inset-bottom))] md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t bg-card pt-2 pl-[max(.5rem,env(safe-area-inset-left))] pr-[max(.5rem,env(safe-area-inset-right))] pb-[max(.5rem,env(safe-area-inset-bottom))] md:hidden"
       >
-        {links.map(({ href, label, icon: Icon, active }) => (
+        {links.map(({ href, label, icon: Icon, active, count }) => (
           <Link
             key={label}
             href={href}
             aria-current={active ? "location" : undefined}
+            aria-label={
+              count
+                ? `${label}, ${count} ${count === 1 ? "conversation" : "conversations"} need review`
+                : undefined
+            }
             className={cn(
               "flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl text-xs font-medium",
               active ? "text-primary" : "text-muted-foreground",
@@ -273,11 +381,19 @@ export function WorkspaceNavigation({
           >
             <span
               className={cn(
-                "flex h-7 w-14 items-center justify-center rounded-full",
+                "relative flex h-7 w-14 items-center justify-center rounded-full",
                 active && "bg-secondary",
               )}
             >
               <Icon className="size-5" aria-hidden="true" />
+              {count > 0 && (
+                <span
+                  aria-hidden="true"
+                  className="absolute -top-1.5 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold leading-none tabular-nums text-primary-foreground"
+                >
+                  {count > 99 ? "99+" : count}
+                </span>
+              )}
             </span>
             {label}
           </Link>

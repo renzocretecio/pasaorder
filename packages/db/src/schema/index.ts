@@ -40,13 +40,37 @@ export const orderSourceEnum = pgEnum("order_source", [
 export const users = pgTable("users", {
   id: bigint("id", { mode: "bigint" }).primaryKey().generatedAlwaysAsIdentity(),
   email: varchar("email", { length: 255 }).notNull().unique(),
-  passwordHash: text("password_hash").notNull(),
+  passwordHash: text("password_hash"),
+  googleSub: varchar("google_sub", { length: 255 }).unique(),
   tokenVersion: integer("token_version").notNull().default(0),
   name: varchar("name", { length: 255 }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
 });
+
+export const googleOAuthStates = pgTable(
+  "google_oauth_states",
+  {
+    stateHash: varchar("state_hash", { length: 64 }).primaryKey(),
+    nonce: varchar("nonce", { length: 64 }).notNull(),
+    codeVerifier: varchar("code_verifier", { length: 128 }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [index("google_oauth_states_expires_at_idx").on(table.expiresAt)],
+);
+
+export const googleOAuthCodes = pgTable(
+  "google_oauth_codes",
+  {
+    codeHash: varchar("code_hash", { length: 64 }).primaryKey(),
+    userId: bigint("user_id", { mode: "bigint" })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [index("google_oauth_codes_expires_at_idx").on(table.expiresAt)],
+);
 
 export const stores = pgTable("stores", {
   id: bigint("id", { mode: "bigint" }).primaryKey().generatedAlwaysAsIdentity(),
@@ -222,6 +246,22 @@ export const metaPageConnections = pgTable("meta_page_connections", {
     .defaultNow(),
 });
 
+export const metaInstagramConnections = pgTable("meta_instagram_connections", {
+  storeId: bigint("store_id", { mode: "bigint" })
+    .primaryKey()
+    .references(() => stores.id, { onDelete: "cascade" }),
+  instagramId: varchar("instagram_id", { length: 64 }).notNull().unique(),
+  instagramUsername: varchar("instagram_username", { length: 255 }).notNull(),
+  pageId: varchar("page_id", { length: 64 }).notNull(),
+  encryptedPageAccessToken: text("encrypted_page_access_token").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 export const metaOauthSessions = pgTable("meta_oauth_sessions", {
   tokenHash: varchar("token_hash", { length: 64 }).primaryKey(),
   storeId: bigint("store_id", { mode: "bigint" })
@@ -319,6 +359,8 @@ export const orderItemsRelations = relations(orderItems, ({ one }) => ({
 
 export const schema = {
   users,
+  googleOAuthStates,
+  googleOAuthCodes,
   stores,
   categories,
   products,

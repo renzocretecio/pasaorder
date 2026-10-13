@@ -1,11 +1,18 @@
 import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
 import type { ReactNode } from "react";
+import { ServiceWorkerRegistration } from "@/components/service-worker-registration";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "PasaOrder",
   description: "Store menus and orders in one place.",
+  applicationName: "PasaOrder",
+  appleWebApp: {
+    capable: true,
+    title: "PasaOrder",
+    statusBarStyle: "default",
+  },
 };
 
 export const viewport: Viewport = {
@@ -22,7 +29,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       className={`${GeistSans.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <ServiceWorkerRegistration />
+      </body>
     </html>
   );
 }

@@ -76,6 +76,16 @@ const post = (route: string, body: unknown) =>
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
+test("Google sign-in stays unavailable until provider credentials are set", async () => {
+  const status = await fetch(`${base}/google/status`);
+  assert.equal(status.status, 200);
+  assert.deepEqual(await status.json(), { enabled: false });
+
+  const start = await fetch(`${base}/google?state=${"a".repeat(64)}`, {
+    redirect: "manual",
+  });
+  assert.equal(start.status, 503);
+});
 test("registration validates input, normalizes email and never returns the hash", async () => {
   assert.equal(
     (await post("register", { name: "Owner", email: "bad", password: "short" }))

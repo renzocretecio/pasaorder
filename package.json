@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "pnpm build:packages && pnpm --parallel --filter \"./packages/**\" --filter api --filter web dev",
     "dev:api": "pnpm build:packages && pnpm --filter api dev",
+    "dev:inference": "cd apps/inference && uv run --env-file .env uvicorn main:app --host 127.0.0.1 --port 8001 --reload",
     "dev:web": "pnpm build:packages && pnpm --filter web dev",
     "build:packages": "pnpm --filter \"./packages/**\" build",
     "build": "pnpm -r build",
@@ -13,7 +14,9 @@
     "typecheck": "pnpm build:packages && pnpm -r typecheck",
     "lint": "pnpm --filter web lint",
     "test": "pnpm build:packages && pnpm --filter api test",
-    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
+    "test:inference": "cd apps/inference && uv run pytest",
+    "check:inference": "cd apps/inference && uv run ruff check . && uv run ruff format --check . && uv run pytest",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm check:inference",
     "db:up": "docker compose up -d db",
     "db:down": "docker compose down",
     "db:generate": "pnpm --filter @pasaorder/db generate",

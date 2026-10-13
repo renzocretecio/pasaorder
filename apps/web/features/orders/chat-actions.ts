@@ -97,7 +97,7 @@ export async function readChatDraft(draftId: string) {
   }
 }
 
-export async function replyMessengerDraft(draftId: string, text: string) {
+export async function replyMetaDraft(draftId: string, text: string) {
   await requireUser();
   if (!idSchema.safeParse(draftId).success)
     return { success: false as const, message: "This draft is invalid." };

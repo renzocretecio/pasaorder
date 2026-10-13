@@ -35,7 +35,10 @@ export type CatalogStore = {
   isPublished: boolean;
   accentColor: string;
 };
-export type WorkspaceStore = CatalogStore & { isDefault: boolean };
+export type WorkspaceStore = CatalogStore & {
+  isDefault: boolean;
+  actionableChatCount: number;
+};
 export type CatalogCategory = {
   id: string;
   storeId: string;
