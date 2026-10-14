@@ -57,9 +57,9 @@ export const errorHandler: ErrorRequestHandler = (
     res.status(413).json({ message: "Request body too large" });
     return;
   }
-  console.error(
-    "Unhandled API error",
-    error instanceof Error ? error.name : "UnknownError",
-  );
-  res.status(500).json({ message: "Internal server error" });
+  console.error("Unhandled API error:", error);
+
+  res.status(500).json({
+    message: "Internal server error",
+  });
 };
