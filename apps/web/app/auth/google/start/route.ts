@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { authApiBaseUrl } from "@/lib/auth";
+import { publicAuthApiBaseUrl } from "@/lib/auth";
 
 const STATE_COOKIE = "pasaorder_google_state";
 const FLOW_COOKIE = "pasaorder_google_flow";
@@ -12,7 +12,7 @@ export function GET(request: NextRequest) {
       ? "register"
       : "login";
   const state = randomBytes(32).toString("hex");
-  const target = new URL(`${authApiBaseUrl()}/auth/google`);
+  const target = new URL(`${publicAuthApiBaseUrl()}/auth/google`);
   target.searchParams.set("state", state);
 
   const response = NextResponse.redirect(target);

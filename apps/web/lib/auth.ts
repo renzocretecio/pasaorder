@@ -20,6 +20,9 @@ export function authApiBaseUrl() {
     "http://localhost:4000/api"
   ).replace(/\/$/, "");
 }
+export function publicAuthApiBaseUrl() {
+  return (process.env.API_PUBLIC_URL ?? authApiBaseUrl()).replace(/\/$/, "");
+}
 
 export async function authApi<T>(
   path: string,
