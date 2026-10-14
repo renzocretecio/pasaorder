@@ -11,12 +11,20 @@ function returnPath(flow: string | undefined) {
   return flow === "register" ? "/register" : "/login";
 }
 
+function webUrl(request: NextRequest, path: string) {
+  const configuredOrigin = process.env.WEB_ORIGIN;
+  if (!configuredOrigin && process.env.NODE_ENV === "production") {
+    throw new Error("WEB_ORIGIN must be configured for Google OAuth");
+  }
+  return new URL(path, configuredOrigin ?? request.nextUrl.origin);
+}
+
 function redirectWithOutcome(
   request: NextRequest,
   flow: string | undefined,
   outcome: string,
 ) {
-  const target = new URL(returnPath(flow), request.url);
+  const target = webUrl(request, returnPath(flow));
   target.searchParams.set("oauth", outcome);
   const response = NextResponse.redirect(target);
   response.headers.set("Cache-Control", "no-store");
@@ -63,7 +71,7 @@ export async function GET(request: NextRequest) {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ code }),
     });
-    const response = NextResponse.redirect(new URL("/dashboard", request.url));
+    const response = NextResponse.redirect(webUrl(request, "/dashboard"));
     response.headers.set("Cache-Control", "no-store");
     response.headers.set("Referrer-Policy", "no-referrer");
     response.cookies.set(SESSION_COOKIE, result.token, {
