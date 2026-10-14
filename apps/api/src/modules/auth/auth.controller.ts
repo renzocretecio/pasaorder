@@ -56,7 +56,7 @@ export async function beginGoogleOAuthHandler(req: Request, res: Response) {
 }
 
 function webOAuthCallback(state: string, outcome: string, code?: string) {
-  const callback = new URL("/api/auth/google/callback", env.WEB_ORIGIN);
+  const callback = new URL("/auth/google/callback", env.WEB_ORIGIN);
   callback.searchParams.set("state", state);
   callback.searchParams.set("outcome", outcome);
   if (code) callback.searchParams.set("code", code);

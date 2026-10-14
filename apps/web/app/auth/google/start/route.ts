@@ -4,7 +4,7 @@ import { authApiBaseUrl } from "@/lib/auth";
 
 const STATE_COOKIE = "pasaorder_google_state";
 const FLOW_COOKIE = "pasaorder_google_flow";
-const COOKIE_PATH = "/api/auth/google";
+const COOKIE_PATH = "/auth/google";
 
 export function GET(request: NextRequest) {
   const flow =

@@ -60,7 +60,7 @@ export function AuthForm({
           >
             <Link
               prefetch={false}
-              href={`/api/auth/google/start?flow=${signingUp ? "register" : "login"}`}
+              href={`/auth/google/start?flow=${signingUp ? "register" : "login"}`}
             >
               <GoogleMark />
               {signingUp ? "Sign up with Google" : "Sign in with Google"}

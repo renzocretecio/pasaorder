@@ -5,7 +5,7 @@ import { ApiError, authApi, SESSION_COOKIE, SESSION_MAX_AGE } from "@/lib/auth";
 
 const STATE_COOKIE = "pasaorder_google_state";
 const FLOW_COOKIE = "pasaorder_google_flow";
-const COOKIE_PATH = "/api/auth/google";
+const COOKIE_PATH = "/auth/google";
 
 function returnPath(flow: string | undefined) {
   return flow === "register" ? "/register" : "/login";
