@@ -8,6 +8,23 @@ export const metadata: Metadata = {
   title: "Privacy Policy | PasaOrder",
   description:
     "How PasaOrder collects, uses, and protects personal information.",
+  alternates: { canonical: "/privacy" },
+  openGraph: {
+    type: "website",
+    siteName: "PasaOrder",
+    title: "Privacy Policy | PasaOrder",
+    description:
+      "How PasaOrder collects, uses, and protects personal information.",
+    url: "/privacy",
+    images: ["/images/landing/merchant-counter.webp"],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Privacy Policy | PasaOrder",
+    description:
+      "How PasaOrder collects, uses, and protects personal information.",
+    images: ["/images/landing/merchant-counter.webp"],
+  },
 };
 
 const sections: LegalSection[] = [

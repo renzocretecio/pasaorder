@@ -79,6 +79,24 @@ test("health and unknown routes have JSON responses", async () => {
   for (const route of ["businesses", "stores"])
     assert.equal((await fetch(`${base}/${route}`)).status, 404);
 });
+test("public store listing exposes only published menu slugs", async () => {
+  const previousQuery = pool.query;
+  let executedSql = "";
+  pool.query = (async (sql: string) => {
+    executedSql = sql;
+    return { rows: [{ slug: "coffee-shop" }] };
+  }) as typeof pool.query;
+  try {
+    const response = await fetch(`${base}/public/stores`);
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      stores: [{ slug: "coffee-shop" }],
+    });
+    assert.match(executedSql, /is_active = true AND is_published = true/);
+  } finally {
+    pool.query = previousQuery;
+  }
+});
 test("management routes and current user reject unauthenticated callers", async () => {
   for (const route of ["catalog/stores", "auth/me"]) {
     assert.equal((await fetch(`${base}/${route}`)).status, 401);

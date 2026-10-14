@@ -45,6 +45,13 @@ export async function listCatalogStores(ownerId: string) {
     )
   ).rows;
 }
+export async function listPublishedStoreSlugs() {
+  return (
+    await pool.query<{ slug: string }>(
+      `SELECT slug FROM stores WHERE is_active = true AND is_published = true ORDER BY slug`,
+    )
+  ).rows;
+}
 export async function readCatalog(
   key: string,
   ownerId?: string,

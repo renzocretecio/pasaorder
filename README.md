@@ -18,6 +18,8 @@ pnpm db:up
 
 The API reads `apps/api/.env`; migration tools read `packages/db/.env`. Both must point to the same database. Docker credentials are for local development only. In `apps/web/.env`, `API_URL` is the server-to-server Express URL including `/api`; `API_PUBLIC_URL` is the browser-reachable API URL including `/api`, used for OAuth redirects when `API_URL` is private; `WEB_ORIGIN` is the public web origin used for OAuth callback redirects; and `NEXT_PUBLIC_SOCKET_URL` is the browser-reachable API origin without `/api` for Socket.IO. Set the API's `WEB_ORIGIN` to the same web app origin. Existing `NEXT_PUBLIC_API_URL` values are accepted as an API fallback. Never put secrets in `NEXT_PUBLIC_*` variables.
 
+SEO uses `WEB_ORIGIN` in `apps/web/.env` for canonical and sitemap URLs. `/sitemap.xml` lists the landing and legal pages plus active, published store menus; `/robots.txt` excludes owner, auth, chat, and order-tracking pages. Public menu links include store-specific title, description, canonical, Open Graph, and Twitter metadata. After changing the production domain, rebuild and restart the web app so metadata and crawler routes use the current origin.
+
 **Migration warning:** existing migration `0001_tranquil_puppet_master.sql` drops and recreates the application tables. Apply the current migration history only to a new/disposable database. Back up and replace the destructive transition with a reviewed data-preserving migration before using it against existing records.
 
 On a new database:

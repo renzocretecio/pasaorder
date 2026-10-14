@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ApiError, authApi } from "@/lib/auth";
@@ -8,6 +9,11 @@ import type {
   PaymentStatus,
 } from "@pasaorder/types";
 import { CopyPaymentDetails } from "@/features/catalog/copy-payment-details";
+
+export const metadata: Metadata = {
+  title: "Order status | PasaOrder",
+  robots: { index: false, follow: false, noarchive: true },
+};
 
 type TrackedOrder = {
   id: string;

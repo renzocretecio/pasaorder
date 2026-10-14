@@ -47,3 +47,4 @@ export type CatalogCategory = {
   items: Product[];
 };
 export type Catalog = { store: CatalogStore; categories: CatalogCategory[] };
+export type PublishedStoreSlug = { slug: string };

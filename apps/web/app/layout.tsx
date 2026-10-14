@@ -5,9 +5,28 @@ import { ServiceWorkerRegistration } from "@/components/service-worker-registrat
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.WEB_ORIGIN ?? "http://localhost:3000"),
   title: "PasaOrder",
-  description: "Store menus and orders in one place.",
+  description:
+    "Simple online menus and order management for small businesses. Accept orders from a QR menu, link, or customer chat.",
   applicationName: "PasaOrder",
+  openGraph: {
+    type: "website",
+    locale: "en_PH",
+    siteName: "PasaOrder",
+    images: [
+      {
+        url: "/images/landing/merchant-counter.webp",
+        width: 1672,
+        height: 941,
+        alt: "A neighborhood store owner managing customer orders with PasaOrder",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    images: ["/images/landing/merchant-counter.webp"],
+  },
   appleWebApp: {
     capable: true,
     title: "PasaOrder",

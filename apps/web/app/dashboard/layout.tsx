@@ -1,8 +1,14 @@
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { requireUser } from "@/lib/auth";
 import type { WorkspaceStore } from "@pasaorder/types";
 import { ownerApi } from "@/lib/catalog";
 import { WorkspaceNavigation } from "@/features/catalog/workspace-navigation";
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
+
 export default async function WorkspaceLayout({
   children,
 }: {

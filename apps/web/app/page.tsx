@@ -17,6 +17,31 @@ export const metadata: Metadata = {
   title: "PasaOrder | Orders made simple, from chat to checkout",
   description:
     "Publish a menu, take orders through a QR code or link, and review Messenger order conversations in one simple workspace for your store.",
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    locale: "en_PH",
+    siteName: "PasaOrder",
+    title: "Orders made simple, from chat to checkout | PasaOrder",
+    description:
+      "Publish a menu, take orders through a QR code or link, and review Messenger order conversations in one simple workspace for your store.",
+    url: "/",
+    images: [
+      {
+        url: "/images/landing/merchant-counter.webp",
+        width: 1672,
+        height: 941,
+        alt: "A neighborhood store owner managing customer orders with PasaOrder",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Orders made simple, from chat to checkout | PasaOrder",
+    description:
+      "Publish a menu, take orders through a QR code or link, and review Messenger order conversations in one simple workspace for your store.",
+    images: ["/images/landing/merchant-counter.webp"],
+  },
 };
 
 const steps = [

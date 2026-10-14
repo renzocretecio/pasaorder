@@ -13,6 +13,11 @@ import {
 import { requireAuth } from "../../middleware/auth.js";
 import * as repository from "./catalog.repository.js";
 export const publicCatalogRouter = Router();
+publicCatalogRouter.get("/", async (_req, res) => {
+  res
+    .set("Cache-Control", "public, max-age=300, s-maxage=300")
+    .json({ stores: await repository.listPublishedStoreSlugs() });
+});
 publicCatalogRouter.get("/:slug", async (req, res) => {
   res.json(await repository.readCatalog(slugSchema.parse(req.params.slug)));
 });

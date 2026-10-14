@@ -8,6 +8,23 @@ export const metadata: Metadata = {
   title: "Terms of Service | PasaOrder",
   description:
     "Terms for using the PasaOrder menu and order management service.",
+  alternates: { canonical: "/terms" },
+  openGraph: {
+    type: "website",
+    siteName: "PasaOrder",
+    title: "Terms of Service | PasaOrder",
+    description:
+      "Terms for using the PasaOrder menu and order management service.",
+    url: "/terms",
+    images: ["/images/landing/merchant-counter.webp"],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Terms of Service | PasaOrder",
+    description:
+      "Terms for using the PasaOrder menu and order management service.",
+    images: ["/images/landing/merchant-counter.webp"],
+  },
 };
 
 const sections: LegalSection[] = [

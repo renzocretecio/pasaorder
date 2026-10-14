@@ -7,7 +7,10 @@ import { ApiError, authApi } from "@/lib/auth";
 import { accentInk, accentText } from "@/features/catalog/color";
 import { CustomerChatView } from "@/features/chat/customer-chat-view";
 
-export const metadata: Metadata = { title: "Chat with a store | PasaOrder" };
+export const metadata: Metadata = {
+  title: "Chat with a store | PasaOrder",
+  robots: { index: false, follow: false },
+};
 
 export default async function CustomerChatPage({
   params,
