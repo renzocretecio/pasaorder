@@ -17,6 +17,9 @@ export default async function CustomerChatPage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
+  // This is a local testing surface, not the production customer ordering flow.
+  if (process.env.NODE_ENV === "production") notFound();
+
   const { slug } = await params;
   if (!slugSchema.safeParse(slug).success) notFound();
   let catalog: Catalog;

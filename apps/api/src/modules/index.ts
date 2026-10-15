@@ -16,7 +16,11 @@ const router = Router();
 router.use("/catalog", catalogRoutes);
 router.use("/public/stores", publicCatalogRouter);
 router.use("/public/orders", orderRoutes);
-router.use("/public/chats", publicChatRouter);
+// Public web chat is a development/test surface. Production chats arrive via
+// connected Meta webhooks and remain available through the authenticated inbox.
+if (process.env.NODE_ENV !== "production") {
+  router.use("/public/chats", publicChatRouter);
+}
 router.use("/orders", ownerOrdersRouter);
 router.use("/meta", metaRoutes);
 router.use("/meta", ownerMetaRouter);

@@ -14,6 +14,7 @@
     "typecheck": "pnpm build:packages && pnpm -r typecheck",
     "lint": "pnpm --filter web lint",
     "test": "pnpm build:packages && pnpm --filter api test",
+    "test:manual-orders": "pnpm --filter @pasaorder/validation build && node scripts/manual-order-queue.test.mjs",
     "test:inference": "cd apps/inference && uv run pytest",
     "check:inference": "cd apps/inference && uv run ruff check . && uv run ruff format --check . && uv run pytest",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm check:inference",

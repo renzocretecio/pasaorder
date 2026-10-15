@@ -30,6 +30,7 @@ type OrderInput = {
     variantId: string | null;
     quantity: number;
     specialInstructions?: string;
+    expectedUnitPrice?: string;
   }[];
 };
 
@@ -50,17 +51,41 @@ async function readCreatedOrder(client: PoolClient, trackingToken: string) {
   return order.rows[0];
 }
 
-export async function createPublicOrder(input: OrderInput) {
+async function createOrder(
+  input: OrderInput,
+  access?: { ownerId: string; storeId: string; source: OrderSource },
+) {
   return transaction(async (client) => {
-    const existing = await client.query<{ trackingToken: string }>(
-      `SELECT tracking_token AS "trackingToken" FROM orders WHERE idempotency_key = $1`,
+    // Serialize retries, including concurrent tabs or a response lost in transit.
+    await client.query(
+      "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
       [input.idempotencyKey],
     );
-    if (existing.rows[0])
+    const existing = await client.query<{
+      trackingToken: string;
+      storeId: string;
+      ownerId: string;
+      slug: string;
+      source: OrderSource;
+    }>(
+      `SELECT o.tracking_token AS "trackingToken", o.store_id AS "storeId", s.owner_id AS "ownerId", s.slug, o.source FROM orders o JOIN stores s ON s.id = o.store_id WHERE o.idempotency_key = $1`,
+      [input.idempotencyKey],
+    );
+    if (existing.rows[0]) {
+      const saved = existing.rows[0];
+      if (
+        access
+          ? saved.storeId !== access.storeId ||
+            saved.ownerId !== access.ownerId ||
+            saved.source !== "MANUAL"
+          : saved.slug !== input.storeSlug || saved.source !== "MENU"
+      )
+        throw new AppError(409, "This request belongs to another order.");
       return {
         order: await readCreatedOrder(client, existing.rows[0].trackingToken),
         created: false,
       };
+    }
 
     const storeResult = await client.query<{
       id: string;
@@ -70,8 +95,8 @@ export async function createPublicOrder(input: OrderInput) {
       gcashNumber: string | null;
       gcashQrUrl: string | null;
     }>(
-      `SELECT id, order_types AS "orderTypes", payment_methods AS "paymentMethods", gcash_account_name AS "gcashAccountName", gcash_number AS "gcashNumber", gcash_qr_url AS "gcashQrUrl" FROM stores WHERE slug = $1 AND is_active = true AND is_published = true FOR SHARE`,
-      [input.storeSlug],
+      `SELECT id, order_types AS "orderTypes", payment_methods AS "paymentMethods", gcash_account_name AS "gcashAccountName", gcash_number AS "gcashNumber", gcash_qr_url AS "gcashQrUrl" FROM stores WHERE ${access ? "id = $1 AND owner_id = $2 AND is_active = true" : "slug = $1 AND is_active = true AND is_published = true"} FOR SHARE`,
+      access ? [access.storeId, access.ownerId] : [input.storeSlug],
     );
     const store = storeResult.rows[0];
     if (!store) throw new AppError(404, "Menu not found");
@@ -130,6 +155,15 @@ export async function createPublicOrder(input: OrderInput) {
           "A selected option is no longer available. Refresh the menu and try again.",
         );
       const unitPrice = item.variantPrice ?? item.price;
+      if (
+        access?.source === "MANUAL" &&
+        line.expectedUnitPrice !== undefined &&
+        cents(line.expectedUnitPrice) !== cents(unitPrice)
+      )
+        throw new AppError(
+          409,
+          "A menu price changed while this order was offline. Refresh the catalog and review the order before syncing.",
+        );
       const lineCents = cents(unitPrice) * line.quantity;
       totalCents += lineCents;
       orderItems.push({
@@ -145,7 +179,7 @@ export async function createPublicOrder(input: OrderInput) {
 
     const trackingToken = randomUUID();
     const created = await client.query<{ id: string }>(
-      `INSERT INTO orders (store_id, customer_id, customer_name, customer_phone, delivery_address, order_type, table_number, payment_method, payment_status, payment_instructions, delivery_fee, total, notes, tracking_token, idempotency_key) VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, 'UNPAID', $8::jsonb, NULL, $9, $10, $11, $12) RETURNING id`,
+      `INSERT INTO orders (store_id, customer_id, customer_name, customer_phone, delivery_address, order_type, table_number, payment_method, payment_status, payment_instructions, delivery_fee, total, notes, tracking_token, idempotency_key, source) VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, 'UNPAID', $8::jsonb, NULL, $9, $10, $11, $12, $13) RETURNING id`,
       [
         store.id,
         input.customerName,
@@ -159,6 +193,7 @@ export async function createPublicOrder(input: OrderInput) {
         input.notes || null,
         trackingToken,
         input.idempotencyKey,
+        access?.source ?? "MENU",
       ],
     );
     for (const item of orderItems) {
@@ -181,6 +216,25 @@ export async function createPublicOrder(input: OrderInput) {
       created: true,
     };
   });
+}
+
+export function createPublicOrder(input: OrderInput) {
+  return createOrder(input);
+}
+
+export function createManualOrder(
+  ownerId: string,
+  storeId: string,
+  input: Omit<OrderInput, "storeSlug">,
+) {
+  return createOrder(
+    { ...input, storeSlug: "" },
+    {
+      ownerId,
+      storeId,
+      source: "MANUAL",
+    },
+  );
 }
 
 export async function getPublicOrder(trackingToken: string) {

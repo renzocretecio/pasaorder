@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import {
   createOrderSchema,
+  createManualOrderSchema,
   idSchema,
   overviewDateRangeSchema,
   updatePaymentStatusSchema,
@@ -89,6 +90,17 @@ publicChatRouter.post("/:token/messages", async (req, res) => {
 });
 
 ownerOrdersRouter.use(requireAuth);
+ownerOrdersRouter.post("/stores/:storeId/manual", async (req, res) => {
+  const storeId = idSchema.parse(req.params.storeId);
+  const input = createManualOrderSchema.parse(req.body);
+  const result = await repository.createManualOrder(
+    req.auth!.userId,
+    storeId,
+    input,
+  );
+  if (result.created) emitOrdersChanged(result.order.storeId);
+  res.status(201).json({ order: result.order });
+});
 ownerOrdersRouter.get("/stores/:storeId/overview", async (req, res) => {
   const storeId = idSchema.parse(req.params.storeId);
   const range =

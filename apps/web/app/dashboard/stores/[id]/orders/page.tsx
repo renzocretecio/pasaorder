@@ -15,7 +15,7 @@ export default async function StoreOrdersPage({
 }) {
   const { id } = await params;
   const { queue, order } = await searchParams;
-  const [{ store }, { orders }, initialHistoryPage] = await Promise.all([
+  const [catalog, { orders }, initialHistoryPage] = await Promise.all([
     getOwnerCatalog(id),
     ownerApi<{ orders: OwnerOrder[] }>(`/orders?storeId=${id}`),
     ownerApi<PastOrdersPage>(`/orders/stores/${id}/history`),
@@ -26,13 +26,14 @@ export default async function StoreOrdersPage({
     <>
       <PageHeading
         title="Orders"
-        description={`${store.name} · Review orders and move each one to its next step.`}
+        description={`${catalog.store.name} · Review orders and move each one to its next step.`}
       />
       <OrdersBoard
         orders={orders}
         initialHistoryPage={initialHistoryPage}
         loadedAt={loadedAt}
         storeId={id}
+        catalog={catalog}
         initialQueue={queue}
         initialOrderId={order}
       />

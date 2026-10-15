@@ -1,0 +1,1 @@
+ALTER TYPE "public"."order_source" ADD VALUE 'MANUAL' BEFORE 'MESSENGER';

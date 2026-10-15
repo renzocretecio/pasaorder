@@ -6,7 +6,8 @@ export type OrderType = (typeof orderTypes)[number];
 export const paymentMethods = ["CASH", "GCASH"] as const;
 export type PaymentMethod = (typeof paymentMethods)[number];
 export type PaymentStatus = "UNPAID" | "PAID";
-export type OrderSource = "MENU" | "MESSENGER" | "INSTAGRAM" | "WEB_CHAT";
+export type OrderSource =
+  "MENU" | "MANUAL" | "MESSENGER" | "INSTAGRAM" | "WEB_CHAT";
 export type CustomerChatMessage = {
   id: string;
   text: string;
@@ -73,7 +74,7 @@ export type ChatReviewContext = {
 export type ChatOrderDraft = {
   id: string;
   storeId: string;
-  source: Exclude<OrderSource, "MENU">;
+  source: Exclude<OrderSource, "MENU" | "MANUAL">;
   conversationText: string;
   draftData: ChatOrderDraftData;
   decision: ChatDecision | null;

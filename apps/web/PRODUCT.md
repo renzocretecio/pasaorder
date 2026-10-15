@@ -24,6 +24,7 @@ The product connects a store's public QR/link ordering flow with its order works
 ## Operating Context
 
 - Store users create and update catalog items, share a stable menu link or QR code, review incoming orders, and update order status.
+- Store owners can enter walk-in, phone, or in-store orders from the Orders workspace. When the orders page and catalog are already open, an order can be saved on the same device while offline and synced after reconnection. The API rechecks item availability and captured prices before creating it; stale orders stay queued for owner review without holding up other orders. Owners can review current prices, accept a change, or replace unavailable items before resubmitting. Lost responses retain the same request key for a safe retry. Saved orders have visible receipts, timestamps, item summaries, and confirmed discard actions; the entry form resets after a successful local save.
 - Customers can copy GCash payment details or download the store's GCash QR code when choosing that payment method. Payment confirmation is a separate step from placing or fulfilling an order.
 - Chat ordering must resolve requested items against the store's actual catalog; the model does not set authoritative prices or availability.
 

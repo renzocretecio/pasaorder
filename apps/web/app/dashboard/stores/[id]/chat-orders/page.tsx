@@ -31,16 +31,18 @@ export default async function ChatOrdersPage({
         title="Customer chats"
         description={`${store.name} · Review possible orders and conversations that need your attention. Chats move as customers reply.`}
       >
-        <Button asChild variant="outline" className="min-h-11 rounded-xl">
-          <Link
-            href={`/chat/${store.slug}`}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Open customer chat
-            <ArrowUpRight className="size-4" aria-hidden="true" />
-          </Link>
-        </Button>
+        {process.env.NODE_ENV !== "production" && (
+          <Button asChild variant="outline" className="min-h-11 rounded-xl">
+            <Link
+              href={`/chat/${store.slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open customer chat
+              <ArrowUpRight className="size-4" aria-hidden="true" />
+            </Link>
+          </Button>
+        )}
       </PageHeading>
       <ChatInbox
         storeId={id}

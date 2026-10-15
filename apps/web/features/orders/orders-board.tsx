@@ -11,6 +11,7 @@ import type {
   OwnerOrder,
   PastOrdersPage,
 } from "@pasaorder/types";
+import type { Catalog } from "@pasaorder/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { peso } from "@/features/catalog/color";
@@ -19,6 +20,7 @@ import {
   updateOrderPayment,
   updateOrderStatus,
 } from "./actions";
+import { ManualOrderCreate } from "./manual-order-create";
 
 type Queue = "NEW" | "CONFIRMED" | "PREPARING" | "READY" | "HISTORY";
 type PaymentFilter = "ALL" | "UNPAID";
@@ -64,6 +66,7 @@ const orderTypeLabel: Record<OrderType, string> = {
 
 const sourceLabel: Record<OwnerOrder["source"], string> = {
   MENU: "QR menu",
+  MANUAL: "Manual",
   MESSENGER: "Messenger",
   INSTAGRAM: "Instagram",
   WEB_CHAT: "Web chat",
@@ -761,6 +764,7 @@ export function OrdersBoard({
   initialHistoryPage,
   loadedAt,
   storeId,
+  catalog,
   initialQueue,
   initialOrderId,
 }: {
@@ -768,6 +772,7 @@ export function OrdersBoard({
   initialHistoryPage: PastOrdersPage;
   loadedAt: string;
   storeId: string;
+  catalog: Catalog;
   initialQueue?: string;
   initialOrderId?: string;
 }) {
@@ -880,6 +885,7 @@ export function OrdersBoard({
 
   return (
     <section aria-label="Order queue">
+      <ManualOrderCreate key={storeId} catalog={catalog} />
       <div className="flex flex-col gap-3 border-b border-border pb-4 lg:flex-row lg:items-center lg:justify-between">
         <div
           className="-mx-1 flex min-w-0 max-w-full gap-1 overflow-x-auto px-1"
@@ -901,7 +907,7 @@ export function OrdersBoard({
             </button>
           ))}
         </div>
-        <div className="flex items-center justify-between gap-3 lg:justify-end">
+        <div className="flex flex-wrap items-center justify-between gap-3 lg:justify-end">
           <span className="flex items-center gap-2 text-xs text-muted-foreground whitespace-nowrap">
             <span
               aria-hidden="true"

@@ -32,6 +32,7 @@ export const paymentMethodEnum = pgEnum("payment_method", ["CASH", "GCASH"]);
 export const paymentStatusEnum = pgEnum("payment_status", ["UNPAID", "PAID"]);
 export const orderSourceEnum = pgEnum("order_source", [
   "MENU",
+  "MANUAL",
   "MESSENGER",
   "INSTAGRAM",
   "WEB_CHAT",

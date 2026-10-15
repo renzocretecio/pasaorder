@@ -155,6 +155,13 @@
       "when": 1791762993241,
       "tag": "0021_mature_shotgun",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1792025424398,
+      "tag": "0022_perpetual_ricochet",
+      "breakpoints": true
     }
   ]
 }

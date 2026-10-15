@@ -97,7 +97,7 @@ export const confirmChatOrderDraftSchema = z
     }
   });
 
-export const createOrderSchema = z
+const createOrderBaseSchema = z
   .object({
     storeSlug: z
       .string()
@@ -126,28 +126,47 @@ export const createOrderSchema = z
           variantId: idSchema.nullable(),
           quantity: z.number().int().positive().max(100),
           specialInstructions: z.string().trim().max(500).optional(),
+          expectedUnitPrice: z
+            .string()
+            .regex(/^(?:0|[1-9]\d{0,7})(?:\.\d{1,2})?$/)
+            .optional(),
         }),
       )
       .min(1)
       .max(100),
   })
-  .strict()
-  .superRefine((order, context) => {
-    if (order.orderType !== "DINE_IN" && order.tableNumber?.trim()) {
-      context.addIssue({
-        code: "custom",
-        path: ["tableNumber"],
-        message: "A table number is only available for dine-in orders",
-      });
-    }
-    if (order.orderType === "DELIVERY" && !order.deliveryAddress?.trim()) {
-      context.addIssue({
-        code: "custom",
-        path: ["deliveryAddress"],
-        message: "Enter a delivery address",
-      });
-    }
-  });
+  .strict();
+
+const validateOrderFulfillment = (
+  order: {
+    orderType: "DINE_IN" | "PICKUP" | "DELIVERY";
+    tableNumber?: string;
+    deliveryAddress?: string;
+  },
+  context: z.RefinementCtx,
+) => {
+  if (order.orderType !== "DINE_IN" && order.tableNumber?.trim()) {
+    context.addIssue({
+      code: "custom",
+      path: ["tableNumber"],
+      message: "A table number is only available for dine-in orders",
+    });
+  }
+  if (order.orderType === "DELIVERY" && !order.deliveryAddress?.trim()) {
+    context.addIssue({
+      code: "custom",
+      path: ["deliveryAddress"],
+      message: "Enter a delivery address",
+    });
+  }
+};
+
+export const createOrderSchema = createOrderBaseSchema.superRefine(
+  validateOrderFulfillment,
+);
+export const createManualOrderSchema = createOrderBaseSchema
+  .omit({ storeSlug: true })
+  .superRefine(validateOrderFulfillment);
 
 export const updateOrderStatusSchema = z
   .object({

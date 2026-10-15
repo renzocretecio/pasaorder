@@ -2,13 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import {
+  createManualOrderSchema,
   idSchema,
   updateOrderStatusSchema,
   updatePaymentStatusSchema,
 } from "@pasaorder/validation";
 import { ApiError, requireUser } from "@/lib/auth";
 import { ownerApi } from "@/lib/catalog";
-import type { PastOrdersPage } from "@pasaorder/types";
+import type { Catalog, PastOrdersPage } from "@pasaorder/types";
 
 export async function loadPastOrdersPage(
   storeId: string,
@@ -93,6 +94,56 @@ export async function updateOrderPayment(orderId: string, status: string) {
         error instanceof ApiError
           ? error.message
           : "Couldn’t update payment status. Please try again.",
+    };
+  }
+}
+
+export async function createManualOrder(storeId: string, value: unknown) {
+  if (!idSchema.safeParse(storeId).success)
+    return {
+      success: false as const,
+      reviewable: true,
+      message: "Invalid store.",
+    };
+  const parsed = createManualOrderSchema.safeParse(value);
+  if (!parsed.success)
+    return {
+      success: false as const,
+      reviewable: true,
+      message: "Check the order details and try again.",
+    };
+  try {
+    await requireUser();
+    const result = await ownerApi<{ order: { id: string } }>(
+      `/orders/stores/${storeId}/manual`,
+      { method: "POST", body: JSON.stringify(parsed.data) },
+    );
+    return { success: true as const, orderId: result.order.id };
+  } catch (error) {
+    return {
+      success: false as const,
+      reviewable:
+        error instanceof ApiError && [400, 409, 422].includes(error.status),
+      message:
+        error instanceof ApiError
+          ? error.message
+          : "Couldn’t save this order. Please try again.",
+    };
+  }
+}
+
+export async function loadManualOrderCatalog(storeId: string) {
+  if (!idSchema.safeParse(storeId).success)
+    return { success: false as const, message: "Invalid store." };
+  try {
+    await requireUser();
+    const catalog = await ownerApi<Catalog>(`/catalog/stores/${storeId}`);
+    return { success: true as const, catalog };
+  } catch {
+    return {
+      success: false as const,
+      message:
+        "Couldn’t refresh the catalog. Reconnect or sign in, then try again.",
     };
   }
 }

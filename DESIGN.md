@@ -221,6 +221,8 @@ Workspace pages use a direct page title with supporting copy beneath it. Put the
 
 Do not automatically redesign unrelated existing dashboard screens while working on a scoped task.
 
+Manual order entry uses a bottom sheet on phones and a centered dialog on larger screens. Keep its header and subtotal/action footer outside the scrolling form, with safe-area padding at the bottom. Searchable product rows show product, option, category, and price; selected items use 44px quantity and removal controls with wrapping names and visible line totals. Saved device orders and creation receipts stay visible in the Orders workspace. Distinguish waiting, review, and connection-retry states; changed prices require an explicit acceptance action.
+
 Keep theme changes intentional and preserve the existing operational layout.
 
 ## Customer Storefront

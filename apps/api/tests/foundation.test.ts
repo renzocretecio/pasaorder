@@ -9,6 +9,7 @@ import {
   setupStoreSchema,
   catalogStoreSettingsSchema,
   createOrderSchema,
+  createManualOrderSchema,
   createProductSchema,
   catalogItemSchema,
   imageUrlSchema,
@@ -881,6 +882,31 @@ test("mobile numbers are optional for checkout while delivery still needs an add
       ...dineInOrder,
       orderType: "PICKUP",
       customerPhone: "not-a-phone",
+    }).success,
+    false,
+  );
+});
+
+test("manual order requests retain price snapshots for safe offline sync", () => {
+  const request = {
+    idempotencyKey: "123e4567-e89b-12d3-a456-426614174000",
+    customerName: "Walk-in Customer",
+    orderType: "PICKUP",
+    paymentMethod: "CASH",
+    items: [
+      {
+        productId: "1",
+        variantId: null,
+        quantity: 2,
+        expectedUnitPrice: "120.00",
+      },
+    ],
+  };
+  assert.equal(createManualOrderSchema.safeParse(request).success, true);
+  assert.equal(
+    createManualOrderSchema.safeParse({
+      ...request,
+      items: [{ ...request.items[0], expectedUnitPrice: "not-a-price" }],
     }).success,
     false,
   );
