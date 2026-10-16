@@ -16,13 +16,13 @@ export function MenuCategories({
     (category) => hash === `#category-${category.id}`,
   )?.id;
   return (
-    <div className="mx-auto flex max-w-5xl gap-2 overflow-x-auto px-5 py-3 sm:px-8">
+    <div className="mx-auto flex max-w-6xl snap-x snap-proximity gap-2 overflow-x-auto overscroll-x-contain px-4 py-2.5 sm:px-8 sm:py-3">
       {categories.map((category) => (
         <a
           key={category.id}
           href={`#category-${category.id}`}
           aria-current={active === category.id ? "location" : undefined}
-          className={`inline-flex min-h-11 shrink-0 items-center rounded-full px-5 text-sm font-medium focus-visible:outline-[var(--store-accent-ink)] ${active === category.id ? "bg-[var(--store-accent)] text-[var(--store-accent-text)]" : "bg-white text-[#59685d] hover:bg-accent hover:text-accent-foreground"}`}
+          className={`inline-flex min-h-11 shrink-0 snap-start items-center rounded-full px-4 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--store-accent-ink)] sm:px-5 ${active === category.id ? "bg-[var(--store-accent)] text-[var(--store-accent-text)]" : "bg-white text-[#59685d] hover:bg-accent hover:text-accent-foreground"}`}
         >
           {category.name}
         </a>

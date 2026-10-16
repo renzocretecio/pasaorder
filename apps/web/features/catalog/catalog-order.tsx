@@ -10,13 +10,15 @@ import {
   GripVertical,
   FileUp,
   Layers,
+  MoreHorizontal,
   Package,
+  Pencil,
   Plus,
   X,
 } from "lucide-react";
 import type { CatalogCategory } from "@pasaorder/types";
 import { Button } from "@/components/ui/button";
-import { Dialog } from "radix-ui";
+import { Dialog, DropdownMenu } from "radix-ui";
 import { CatalogImage } from "./catalog-image";
 import { peso } from "./color";
 import { saveCatalogOrder } from "./actions";
@@ -246,41 +248,60 @@ export function CatalogOrder({
                 className={`overflow-hidden rounded-2xl border bg-card ${isReordering ? "border-dashed border-primary/50" : ""}`}
               >
                 <header className="flex items-center justify-between gap-3 border-b px-4 py-3 sm:px-5">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <div className="flex min-w-0 items-baseline gap-2">
-                      <h3 className="min-w-0 break-words text-base font-semibold">
-                        {category.name}
-                      </h3>
-                      <span className="text-[13px] text-muted-foreground">
-                        {category.items.length}
-                      </span>
-                    </div>
+                  <div className="flex min-w-0 items-baseline gap-2">
+                    <h3 className="min-w-0 truncate text-base font-semibold">
+                      {category.name}
+                    </h3>
+                    <span className="shrink-0 text-[13px] text-muted-foreground">
+                      {category.items.length}
+                    </span>
                   </div>
-                  <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                  <div className="flex shrink-0 items-center gap-2">
                     {!isReordering && (
-                      <>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          className="inline-flex min-h-11 shrink-0 items-center rounded-lg px-2 text-[13px] font-medium text-primary hover:bg-muted"
-                          disabled={category.items.length < 2}
-                          onClick={() => {
-                            setCategories(savedCategories);
-                            setError("");
-                            setReorderingItemsCategoryId(category.id);
-                          }}
-                        >
-                          <ArrowDownUp aria-hidden="true" />
-                          Reorder products
-                        </Button>
-                        <Link
-                          href={`${base}/categories/${category.id}`}
-                          className="inline-flex min-h-11 shrink-0 items-center rounded-lg px-2 text-[13px] font-medium text-primary hover:bg-muted"
-                          aria-label={`Edit category ${category.name}`}
-                        >
-                          Edit category
-                        </Link>
-                      </>
+                      <DropdownMenu.Root>
+                        <DropdownMenu.Trigger asChild>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-lg"
+                            aria-label={`Actions for ${category.name}`}
+                          >
+                            <MoreHorizontal aria-hidden="true" />
+                          </Button>
+                        </DropdownMenu.Trigger>
+                        <DropdownMenu.Portal>
+                          <DropdownMenu.Content
+                            align="end"
+                            sideOffset={6}
+                            className="z-50 min-w-48 rounded-xl border bg-popover p-1 text-popover-foreground shadow-lg outline-none"
+                          >
+                            <DropdownMenu.Item
+                              disabled={category.items.length < 2}
+                              onSelect={() => {
+                                setCategories(savedCategories);
+                                setError("");
+                                setReorderingItemsCategoryId(category.id);
+                              }}
+                              className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-3 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                            >
+                              <ArrowDownUp
+                                className="size-4"
+                                aria-hidden="true"
+                              />
+                              Reorder products
+                            </DropdownMenu.Item>
+                            <DropdownMenu.Item asChild>
+                              <Link
+                                href={`${base}/categories/${category.id}`}
+                                className="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-3 text-sm outline-none focus:bg-accent focus:text-accent-foreground"
+                              >
+                                <Pencil className="size-4" aria-hidden="true" />
+                                Edit category
+                              </Link>
+                            </DropdownMenu.Item>
+                          </DropdownMenu.Content>
+                        </DropdownMenu.Portal>
+                      </DropdownMenu.Root>
                     )}
                     {reorderingItemsCategoryId === category.id && (
                       <>
@@ -368,9 +389,6 @@ export function CatalogOrder({
                               >
                                 {item.name}
                               </Link>
-                              <p className="mt-1 text-[13px] text-muted-foreground">
-                                Drag to change its position
-                              </p>
                             </div>
                           </div>
                         ) : (
@@ -392,7 +410,13 @@ export function CatalogOrder({
                                   {item.variants.length > 0 && "From "}
                                   {peso(item.price)}
                                 </span>
-                                <span className="text-muted-foreground">
+                                <span
+                                  className={`inline-flex items-center gap-1.5 ${item.isAvailable ? "text-emerald-800" : "text-muted-foreground"}`}
+                                >
+                                  <span
+                                    aria-hidden="true"
+                                    className={`size-1.5 rounded-full ${item.isAvailable ? "bg-emerald-600" : "bg-muted-foreground/50"}`}
+                                  />
                                   {item.isAvailable
                                     ? "Available"
                                     : "Unavailable"}

@@ -350,7 +350,7 @@ export function CartCheckout({
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/45" />
         <Dialog.Content
           style={accentStyle}
-          className="fixed inset-x-3 top-1/2 z-50 mx-auto flex max-h-[min(44rem,calc(100dvh-1.5rem))] w-[calc(100%-1.5rem)] max-w-lg -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-[#d6dfd6] bg-white text-[#18251d] shadow-xl outline-none"
+          className="fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[min(44rem,calc(100dvh-0.5rem))] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl border border-[#d6dfd6] bg-white text-[#18251d] shadow-xl outline-none sm:inset-x-4 sm:bottom-auto sm:top-1/2 sm:max-h-[min(44rem,calc(100dvh-2rem))] sm:w-[calc(100%-2rem)] sm:-translate-y-1/2 sm:rounded-2xl"
         >
           {(!online || refreshing) && step !== "placed" && (
             <p
@@ -685,7 +685,7 @@ export function CartCheckout({
                   </p>
                 )}
               </div>
-              <div className="border-t border-[#d6dfd6] px-5 py-4">
+              <div className="border-t border-[#d6dfd6] px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pb-4">
                 <Button
                   type="submit"
                   disabled={pending || !cart.length || !online || refreshing}
@@ -856,7 +856,7 @@ export function CartCheckout({
                   </p>
                 )}
               </div>
-              <div className="border-t border-[#d6dfd6] px-5 py-4">
+              <div className="border-t border-[#d6dfd6] px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pb-4">
                 <div className="flex items-center justify-between text-sm font-semibold">
                   <span>
                     {orderType === "DELIVERY"
