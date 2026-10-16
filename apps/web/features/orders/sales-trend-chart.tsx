@@ -47,7 +47,7 @@ export function SalesTrendChart({
   return (
     <figure>
       <figcaption className="sr-only">
-        Completed order sales by placement date over the last seven days
+        Daily completed order sales for the selected date range
       </figcaption>
       <AreaChart
         data={data}
@@ -79,26 +79,6 @@ export function SalesTrendChart({
           content={({ point }) => tooltipContent(point)}
         />
       </AreaChart>
-      <details className="mt-3 border-t pt-3">
-        <summary className="w-fit cursor-pointer rounded-md py-2 text-sm font-medium text-primary focus-visible:outline-2 focus-visible:outline-ring">
-          View daily totals
-        </summary>
-        <dl className="mt-1 divide-y text-sm">
-          {days.map((day) => (
-            <div key={day.date} className="flex justify-between gap-4 py-2">
-              <dt>
-                {new Date(`${day.date}T12:00:00Z`).toLocaleDateString("en-PH", {
-                  weekday: "short",
-                  month: "short",
-                  day: "numeric",
-                  timeZone: "UTC",
-                })}
-              </dt>
-              <dd className="font-medium tabular-nums">{peso(day.sales)}</dd>
-            </div>
-          ))}
-        </dl>
-      </details>
     </figure>
   );
 }

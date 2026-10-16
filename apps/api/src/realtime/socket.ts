@@ -27,6 +27,23 @@ export function initRealtime(server: HttpServer) {
 
   io.use(async (socket, next) => {
     try {
+      const trackingToken = socket.handshake.auth?.trackingToken;
+      if (
+        typeof trackingToken === "string" &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          trackingToken,
+        )
+      ) {
+        const order = await queryOne<{ id: string }>(
+          `SELECT id FROM orders WHERE tracking_token = $1`,
+          [trackingToken],
+        );
+        if (!order) throw new Error("Order not found");
+        socket.data.trackingToken = trackingToken;
+        next();
+        return;
+      }
+
       const token = socket.handshake.auth?.token;
       if (typeof token !== "string") throw new Error("Missing token");
       const payload = jwt.verify(token, env.JWT_SECRET, {
@@ -57,6 +74,12 @@ export function initRealtime(server: HttpServer) {
   });
 
   io.on("connection", (socket) => {
+    const trackingToken = socket.data.trackingToken as string | undefined;
+    if (trackingToken) {
+      socket.join(`customer-order:${trackingToken}`);
+      return;
+    }
+
     const ownerRoom = `owner:${socket.data.userId}`;
     socket.join(ownerRoom);
     const expiry = socket.data.tokenExpiresAt as number | undefined;
@@ -99,6 +122,10 @@ export function initRealtime(server: HttpServer) {
 
 export function emitOrdersChanged(storeId: string) {
   io?.to(`store:${storeId}`).emit("orders:changed", { storeId });
+}
+
+export function emitCustomerOrderChanged(trackingToken: string) {
+  io?.to(`customer-order:${trackingToken}`).emit("customer:order-changed");
 }
 
 export function disconnectOwnerSockets(userId: string) {

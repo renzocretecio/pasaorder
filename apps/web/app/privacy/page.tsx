@@ -43,7 +43,13 @@ const sections: LegalSection[] = [
           include files uploaded through custom fields that are no longer
           offered. Store owners can enter orders manually, including while
           offline; unsynced orders are temporarily kept in that browser&apos;s
-          local storage until they sync or are removed.
+          local storage until they sync or are removed. For scheduled pickup and
+          delivery, we store the requested date and time with the order. If a
+          customer enables order alerts, we also store that browser&apos;s push
+          endpoint and keys for that order. A store owner who enables new-order
+          alerts has the same notification data stored for their account. We use
+          these subscriptions only for the selected alerts and remove a customer
+          subscription after the ready alert or when its endpoint expires.
         </p>
         <p>
           We also receive technical information needed to operate and protect
@@ -67,6 +73,10 @@ const sections: LegalSection[] = [
           them.
         </li>
         <li>To maintain, troubleshoot, secure, and improve PasaOrder.</li>
+        <li>
+          To send optional new-order alerts to store owners and one-time
+          order-ready alerts to customers who opt in on their device.
+        </li>
         <li>To respond to support, privacy, and legal requests.</li>
       </ul>
     ),

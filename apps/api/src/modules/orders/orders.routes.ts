@@ -13,7 +13,10 @@ import {
 import { AppError } from "../../middleware/errors.js";
 import { requireAuth } from "../../middleware/auth.js";
 import * as repository from "./orders.repository.js";
-import { emitOrdersChanged } from "../../realtime/socket.js";
+import {
+  emitCustomerOrderChanged,
+  emitOrdersChanged,
+} from "../../realtime/socket.js";
 import {
   deletePrivateOrderFile,
   readOrderAttachment,
@@ -21,6 +24,10 @@ import {
 } from "./order-attachments.storage.js";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
+import {
+  notifyCustomerOrderReady,
+  notifyOwnerOfNewOrder,
+} from "../notifications/push.service.js";
 
 const router = Router();
 export const ownerOrdersRouter = Router();
@@ -126,21 +133,24 @@ ownerOrdersRouter.get("/:orderId/payment-proof", async (req, res) => {
   await pipeline(object.Body, res);
 });
 ownerOrdersRouter.patch("/:id/status", async (req, res) => {
-  const { storeId } = await repository.updateOwnerOrder(
-    req.auth!.userId,
-    idSchema.parse(req.params.id),
-    updateOrderStatusSchema.parse(req.body),
-  );
+  const statusInput = updateOrderStatusSchema.parse(req.body);
+  const orderId = idSchema.parse(req.params.id);
+  const { storeId, trackingToken, previousStatus } =
+    await repository.updateOwnerOrder(req.auth!.userId, orderId, statusInput);
   emitOrdersChanged(storeId);
+  emitCustomerOrderChanged(trackingToken);
+  if (previousStatus === "PREPARING" && statusInput.status === "READY")
+    void notifyCustomerOrderReady(orderId);
   res.sendStatus(204);
 });
 ownerOrdersRouter.patch("/:id/payment", async (req, res) => {
-  const { storeId } = await repository.updateOwnerOrderPayment(
+  const { storeId, trackingToken } = await repository.updateOwnerOrderPayment(
     req.auth!.userId,
     idSchema.parse(req.params.id),
     updatePaymentStatusSchema.parse(req.body).status,
   );
   emitOrdersChanged(storeId);
+  emitCustomerOrderChanged(trackingToken);
   res.sendStatus(204);
 });
 
@@ -149,7 +159,10 @@ router.post("/", async (req, res) => {
     throw new AppError(400, "File uploads are not available at checkout");
   const input = createOrderSchema.parse(req.body);
   const result = await repository.createPublicOrder(input);
-  if (result.created) emitOrdersChanged(result.order.storeId);
+  if (result.created) {
+    emitOrdersChanged(result.order.storeId);
+    void notifyOwnerOfNewOrder(result.order.id, result.order.storeId);
+  }
   res.status(201).json({ order: result.order });
 });
 
@@ -229,6 +242,7 @@ router.post(
       if (result.previousObjectKey)
         await deletePrivateOrderFile(result.previousObjectKey).catch(() => {});
       emitOrdersChanged(result.storeId);
+      emitCustomerOrderChanged(token.data);
       res.status(201).json({ uploadedAt: new Date().toISOString() });
     } catch (error) {
       await deletePrivateOrderFile(objectKey).catch(() => {});

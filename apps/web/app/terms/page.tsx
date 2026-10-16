@@ -51,7 +51,11 @@ const sections: LegalSection[] = [
         include pickup, delivery, or dine-in, customer contact details, and an
         optional order note. Store owners can also enter orders manually; an
         unsynced manual order may be saved in the owner&apos;s browser until it
-        can be sent to the service. Features may change as the service develops.
+        can be sent to the service. Customers may request a future pickup or
+        delivery time; the store must confirm that requested time. Store owners
+        and customers may opt in to supported browser notifications for new
+        orders and order-ready updates. Features may change as the service
+        develops.
       </p>
     ),
   },
@@ -97,7 +101,10 @@ const sections: LegalSection[] = [
         PasaOrder does not process or settle those payments. Customers may
         upload payment proof for the store to review. An upload does not confirm
         that a payment was made or verified; the store owner must check and
-        confirm it separately.
+        confirm it separately. A requested scheduled time is subject to the
+        store&apos;s confirmation. Device notifications depend on browser
+        support, permission settings, and the availability of the device and
+        network; keep the tracking link for current order details.
       </p>
     ),
   },

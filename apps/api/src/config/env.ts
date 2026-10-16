@@ -41,6 +41,9 @@ export const envSchema = z
       .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
       .max(32)
       .optional(),
+    VAPID_PUBLIC_KEY: z.string().min(1).optional(),
+    VAPID_PRIVATE_KEY: z.string().min(1).optional(),
+    VAPID_SUBJECT: z.string().url().optional(),
   })
   .superRefine((values, context) => {
     const googleValues = [
@@ -65,6 +68,19 @@ export const envSchema = z
         code: "custom",
         path: ["GOOGLE_REDIRECT_URI"],
         message: "Use an HTTPS Google callback URL in production",
+      });
+    }
+    const vapidValues = [
+      values.VAPID_PUBLIC_KEY,
+      values.VAPID_PRIVATE_KEY,
+      values.VAPID_SUBJECT,
+    ];
+    if (vapidValues.some(Boolean) && vapidValues.some((value) => !value)) {
+      context.addIssue({
+        code: "custom",
+        path: ["VAPID_PUBLIC_KEY"],
+        message:
+          "Set VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, and VAPID_SUBJECT together",
       });
     }
   });

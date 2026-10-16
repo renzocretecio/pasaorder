@@ -127,7 +127,7 @@ export function OverviewDateRange({
           type="button"
           variant="outline"
           disabled={pending}
-          aria-label="Select KPI date range"
+          aria-label="Select report date range"
           className="h-11 w-full justify-start rounded-xl border-input bg-card px-3 text-left shadow-none sm:w-auto"
         >
           <CalendarDays className="size-4 text-primary" aria-hidden="true" />

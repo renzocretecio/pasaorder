@@ -25,6 +25,7 @@ Completed items are checked. Unchecked items are not part of the current product
 - [x] Add order notes
 - [x] Enter customer contact details
 - [x] Place an order without creating an account
+- [x] Schedule pickup or delivery for a future date and time
 
 ## 4. Order Management
 
@@ -33,6 +34,9 @@ Completed items are checked. Unchecked items are not part of the current product
 - [x] Update order status
 - [x] View customer details and order notes
 - [x] Let customers track their orders
+- [x] Update customer tracking pages in real time when order or payment status changes
+- [x] Let customers opt in to a one-time ready notification
+- [x] Let store owners opt in to new-order notifications
 
 ## 5. Payments
 

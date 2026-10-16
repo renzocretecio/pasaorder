@@ -28,6 +28,7 @@ type PlacedOrder = {
   total: string;
   orderType: OrderType;
   trackingToken: string;
+  scheduledFor: string | null;
   deliveryFee: string | null;
   tableNumber: string | null;
   paymentMethod: PaymentMethod;
@@ -188,6 +189,8 @@ export function CartCheckout({
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [scheduleForLater, setScheduleForLater] = useState(false);
+  const [scheduledForInput, setScheduledForInput] = useState("");
   const [tableNumber, setTableNumber] = useState("");
   const [notes, setNotes] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(
@@ -212,7 +215,6 @@ export function CartCheckout({
     0,
   );
   const subtotal = peso((subtotalCents / 100).toFixed(2));
-
   function close(openState: boolean) {
     onOpenChange(openState);
     if (!openState) {
@@ -223,6 +225,8 @@ export function CartCheckout({
         setName("");
         setPhone("");
         setAddress("");
+        setScheduleForLater(false);
+        setScheduledForInput("");
         setTableNumber("");
         setNotes("");
       }
@@ -250,6 +254,21 @@ export function CartCheckout({
       );
       return;
     }
+    if (scheduleForLater && orderType !== "DINE_IN") {
+      const requestedTime = Date.parse(`${scheduledForInput}+08:00`);
+      const now = Date.now();
+      if (
+        !Number.isFinite(requestedTime) ||
+        requestedTime < now + 15 * 60_000
+      ) {
+        setError("Choose a time at least 15 minutes from now.");
+        return;
+      }
+      if (requestedTime > now + 90 * 24 * 60 * 60_000) {
+        setError("Choose a date within the next 90 days.");
+        return;
+      }
+    }
     setPending(true);
     setError("");
     const storage = persistCheckout ? deviceStorage() : null;
@@ -269,6 +288,10 @@ export function CartCheckout({
             ? tableNumber.trim() || undefined
             : undefined,
         deliveryAddress: orderType === "DELIVERY" ? address : undefined,
+        scheduledFor:
+          scheduleForLater && orderType !== "DINE_IN" && scheduledForInput
+            ? new Date(`${scheduledForInput}+08:00`).toISOString()
+            : undefined,
         notes: notes || undefined,
         items: cart.map((line) => ({
           productId: line.item.id,
@@ -391,6 +414,20 @@ export function CartCheckout({
                   <p className="mt-3 text-xs leading-relaxed text-[#59685d]">
                     Delivery fee will be confirmed by the store before your
                     order is finalized.
+                  </p>
+                )}
+                {placedOrder.scheduledFor && (
+                  <p className="mt-3 text-xs leading-relaxed text-[#59685d]">
+                    Requested for{" "}
+                    {new Date(placedOrder.scheduledFor).toLocaleString(
+                      "en-PH",
+                      {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                        timeZone: "Asia/Manila",
+                      },
+                    )}{" "}
+                    Philippine time. The store will confirm availability.
                   </p>
                 )}
               </div>
@@ -529,6 +566,48 @@ export function CartCheckout({
                       location.
                     </p>
                   </div>
+                )}
+                {orderType !== "DINE_IN" && (
+                  <fieldset className="rounded-xl border border-[#d6dfd6] px-4 py-3">
+                    <label className="flex min-h-8 cursor-pointer items-center gap-2 text-sm font-medium">
+                      <input
+                        type="checkbox"
+                        checked={scheduleForLater}
+                        onChange={(event) =>
+                          setScheduleForLater(event.target.checked)
+                        }
+                        className="size-4 accent-[var(--store-accent-ink)]"
+                      />
+                      Schedule for later
+                    </label>
+                    {scheduleForLater && (
+                      <div className="mt-3">
+                        <label
+                          htmlFor="checkout-scheduled-for"
+                          className="mb-1.5 block text-sm font-medium"
+                        >
+                          {orderType === "PICKUP" ? "Pickup" : "Delivery"} date
+                          and time
+                        </label>
+                        <input
+                          id="checkout-scheduled-for"
+                          name="scheduledFor"
+                          type="datetime-local"
+                          required
+                          value={scheduledForInput}
+                          onChange={(event) =>
+                            setScheduledForInput(event.target.value)
+                          }
+                          className="h-12 w-full rounded-xl border border-[#d6dfd6] bg-white px-3 text-base outline-none focus:border-[var(--store-accent-ink)] focus:ring-2 focus:ring-[var(--store-accent-soft)]"
+                        />
+                        <p className="mt-1.5 text-xs leading-relaxed text-[#59685d]">
+                          Times use Philippine time. Choose at least 15 minutes
+                          ahead and within 90 days. The store will confirm
+                          availability.
+                        </p>
+                      </div>
+                    )}
+                  </fieldset>
                 )}
                 <div>
                   <label

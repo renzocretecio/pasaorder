@@ -12,6 +12,8 @@ import type {
 } from "@pasaorder/types";
 import { CopyPaymentDetails } from "@/features/catalog/copy-payment-details";
 import { PaymentProofUpload } from "@/features/orders/payment-proof-upload";
+import { CustomerReadyAlert } from "@/features/notifications/customer-ready-alert";
+import { CustomerOrderLiveUpdates } from "@/features/orders/customer-order-live-updates";
 
 export const metadata: Metadata = {
   title: "Order status | PasaOrder",
@@ -36,6 +38,7 @@ type TrackedOrder = {
   paymentProof: { uploadedAt: string } | null;
   formAnswers: StoreOrderAnswer[];
   createdAt: string;
+  scheduledFor: string | null;
   items: {
     productName: string;
     productType: "PHYSICAL" | "MADE_TO_ORDER" | "SERVICE";
@@ -102,6 +105,18 @@ export default async function OrderTrackingPage({
               timeStyle: "short",
             })}
           </p>
+          <CustomerOrderLiveUpdates trackingToken={trackingToken} />
+          {order.scheduledFor && (
+            <p className="mt-2 text-sm font-medium">
+              Requested for{" "}
+              {new Date(order.scheduledFor).toLocaleString("en-PH", {
+                dateStyle: "medium",
+                timeStyle: "short",
+                timeZone: "Asia/Manila",
+              })}{" "}
+              (Philippine time)
+            </p>
+          )}
           {order.orderType === "DINE_IN" && order.tableNumber && (
             <p className="mt-2 text-sm font-medium">
               Table {order.tableNumber}
@@ -303,9 +318,13 @@ export default async function OrderTrackingPage({
             )}
         </section>
 
+        {order.status !== "READY" &&
+          order.status !== "COMPLETED" &&
+          order.status !== "CANCELLED" && (
+            <CustomerReadyAlert trackingToken={trackingToken} />
+          )}
         <p className="border-t border-[#d6dfd6] pt-4 text-sm leading-relaxed text-[#59685d]">
-          Keep this page to check your order status. Refresh it for the latest
-          update.
+          Keep this page open to see order updates as they happen.
           {order.orderType !== "DINE_IN" &&
             " The store will contact you at the number you provided."}
         </p>

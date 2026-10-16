@@ -1,4 +1,5 @@
 import { Router } from "express";
+import notificationsRoutes from "./notifications/notifications.routes.js";
 
 import authRoutes from "./auth/auth.routes.js";
 import imagesRoutes from "./images/images.routes.js";
@@ -16,5 +17,6 @@ router.use("/orders", ownerOrdersRouter);
 
 router.use("/auth", authRoutes);
 router.use("/images", imagesRoutes);
+router.use("/notifications", notificationsRoutes);
 
 export default router;

@@ -23,6 +23,7 @@ test("completing an order updates its status in a transaction", async () => {
           rows: [
             {
               storeId: "9",
+              trackingToken: "00000000-0000-4000-8000-000000000042",
               status: "READY",
               orderType: "PICKUP",
               deliveryFee: null,
@@ -40,6 +41,8 @@ test("completing an order updates its status in a transaction", async () => {
       await updateOwnerOrder("7", "42", { status: "COMPLETED" }),
       {
         storeId: "9",
+        trackingToken: "00000000-0000-4000-8000-000000000042",
+        previousStatus: "READY",
       },
     );
     assert.deepEqual(

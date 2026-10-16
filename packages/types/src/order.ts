@@ -130,6 +130,7 @@ export type Order = {
   source: OrderSource;
   paymentInstructions: PaymentInstructions | null;
   deliveryFee: string | null;
+  scheduledFor: string | null;
   total: string;
   notes: string | null;
   formAnswers?: StoreOrderAnswer[];
@@ -151,6 +152,7 @@ export type OwnerOrder = Pick<
   | "deliveryAddress"
   | "tableNumber"
   | "deliveryFee"
+  | "scheduledFor"
   | "total"
   | "notes"
   | "formAnswers"

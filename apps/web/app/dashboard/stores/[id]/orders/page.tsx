@@ -3,6 +3,7 @@ import type { OwnerOrder, PastOrdersPage } from "@pasaorder/types";
 import { PageHeading } from "@/features/catalog/workspace";
 import { OrdersBoard } from "@/features/orders/orders-board";
 import { getOwnerCatalog, ownerApi } from "@/lib/catalog";
+import { OwnerPushAlerts } from "@/features/notifications/owner-push-alerts";
 
 export const metadata: Metadata = { title: "Orders | PasaOrder" };
 
@@ -27,7 +28,9 @@ export default async function StoreOrdersPage({
       <PageHeading
         title="Orders"
         description={`${catalog.store.name} · Review orders and move each one to its next step.`}
-      />
+      >
+        <OwnerPushAlerts />
+      </PageHeading>
       <OrdersBoard
         orders={orders}
         initialHistoryPage={initialHistoryPage}

@@ -19,6 +19,7 @@ const createOrderBaseSchema = z
       .regex(/^[+()\d\s.-]+$/)
       .optional(),
     orderType: z.enum(["DINE_IN", "PICKUP", "DELIVERY"]),
+    scheduledFor: z.iso.datetime({ offset: true }).optional(),
     paymentMethod: z.enum(["CASH", "GCASH"]),
     tableNumber: z.string().trim().max(40).optional(),
     deliveryAddress: z.string().trim().max(500).optional(),
@@ -69,6 +70,7 @@ const validateOrderFulfillment = (
     orderType: "DINE_IN" | "PICKUP" | "DELIVERY";
     tableNumber?: string;
     deliveryAddress?: string;
+    scheduledFor?: string;
   },
   context: z.RefinementCtx,
 ) => {
@@ -86,13 +88,38 @@ const validateOrderFulfillment = (
       message: "Enter a delivery address",
     });
   }
+  if (order.scheduledFor) {
+    if (order.orderType === "DINE_IN") {
+      context.addIssue({
+        code: "custom",
+        path: ["scheduledFor"],
+        message: "Scheduled orders are available for pickup or delivery",
+      });
+      return;
+    }
+    const scheduledTime = Date.parse(order.scheduledFor);
+    const now = Date.now();
+    if (scheduledTime < now + 15 * 60_000) {
+      context.addIssue({
+        code: "custom",
+        path: ["scheduledFor"],
+        message: "Choose a time at least 15 minutes from now",
+      });
+    } else if (scheduledTime > now + 90 * 24 * 60 * 60_000) {
+      context.addIssue({
+        code: "custom",
+        path: ["scheduledFor"],
+        message: "Choose a date within the next 90 days",
+      });
+    }
+  }
 };
 
 export const createOrderSchema = createOrderBaseSchema.superRefine(
   validateOrderFulfillment,
 );
 export const createManualOrderSchema = createOrderBaseSchema
-  .omit({ storeSlug: true })
+  .omit({ storeSlug: true, scheduledFor: true })
   .superRefine(validateOrderFulfillment);
 
 export const updateOrderStatusSchema = z
