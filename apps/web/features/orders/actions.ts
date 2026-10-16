@@ -98,6 +98,94 @@ export async function updateOrderPayment(orderId: string, status: string) {
   }
 }
 
+export async function saveOwnerPushSubscription(value: unknown) {
+  await requireUser();
+  if (!value || typeof value !== "object")
+    return {
+      success: false,
+      message: "Invalid device notification subscription.",
+    };
+  const subscription = value as {
+    endpoint?: unknown;
+    keys?: { p256dh?: unknown; auth?: unknown };
+  };
+  try {
+    if (
+      typeof subscription.endpoint !== "string" ||
+      subscription.endpoint.length > 2048 ||
+      new URL(subscription.endpoint).protocol !== "https:" ||
+      typeof subscription.keys?.p256dh !== "string" ||
+      typeof subscription.keys?.auth !== "string" ||
+      subscription.keys.p256dh.length > 256 ||
+      subscription.keys.auth.length > 256
+    )
+      throw new Error("invalid");
+  } catch {
+    return {
+      success: false,
+      message: "Invalid device notification subscription.",
+    };
+  }
+  try {
+    await ownerApi("/notifications/owner/subscription", {
+      method: "POST",
+      body: JSON.stringify(subscription),
+    });
+    return { success: true as const };
+  } catch (error) {
+    return {
+      success: false as const,
+      message:
+        error instanceof ApiError
+          ? error.message
+          : "Could not enable order alerts. Please try again.",
+    };
+  }
+}
+
+export async function removeOwnerPushSubscription(endpoint: string) {
+  await requireUser();
+  try {
+    if (endpoint.length > 2048 || new URL(endpoint).protocol !== "https:")
+      throw new Error("invalid");
+  } catch {
+    return { success: false, message: "Invalid device notification endpoint." };
+  }
+  try {
+    await ownerApi("/notifications/owner/subscription", {
+      method: "DELETE",
+      body: JSON.stringify({ endpoint }),
+    });
+    return { success: true as const };
+  } catch (error) {
+    return {
+      success: false as const,
+      message:
+        error instanceof ApiError
+          ? error.message
+          : "Could not turn off order alerts. Please try again.",
+    };
+  }
+}
+
+export async function getOwnerPushSubscription(endpoint: string) {
+  await requireUser();
+  try {
+    if (endpoint.length > 2048 || new URL(endpoint).protocol !== "https:")
+      throw new Error("invalid");
+  } catch {
+    return { success: false as const, enabled: false };
+  }
+  try {
+    const result = await ownerApi<{ enabled: boolean }>(
+      `/notifications/owner/subscription?endpoint=${encodeURIComponent(endpoint)}`,
+    );
+    return { success: true as const, enabled: result.enabled };
+  } catch {
+    return { success: false as const, enabled: false };
+  }
+}
+
 export async function createManualOrder(storeId: string, value: unknown) {
   if (!idSchema.safeParse(storeId).success)
     return {

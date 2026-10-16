@@ -21,6 +21,7 @@ type OrderInput = {
   paymentMethod: "CASH" | "GCASH";
   tableNumber?: string;
   deliveryAddress?: string;
+  scheduledFor?: string;
   notes?: string;
   items: {
     productId: string;
@@ -45,7 +46,7 @@ function amount(value: number) {
 
 async function readCreatedOrder(client: PoolClient, trackingToken: string) {
   const order = await client.query(
-    `SELECT id, store_id AS "storeId", status, order_type AS "orderType", table_number AS "tableNumber", delivery_fee AS "deliveryFee", total, tracking_token AS "trackingToken", payment_method AS "paymentMethod", payment_status AS "paymentStatus", payment_instructions AS "paymentInstructions" FROM orders WHERE tracking_token = $1`,
+    `SELECT id, store_id AS "storeId", status, order_type AS "orderType", table_number AS "tableNumber", delivery_fee AS "deliveryFee", scheduled_for AS "scheduledFor", total, tracking_token AS "trackingToken", payment_method AS "paymentMethod", payment_status AS "paymentStatus", payment_instructions AS "paymentInstructions" FROM orders WHERE tracking_token = $1`,
     [trackingToken],
   );
   return order.rows[0];
@@ -242,7 +243,7 @@ async function createOrder(
 
     const trackingToken = randomUUID();
     const created = await client.query<{ id: string }>(
-      `INSERT INTO orders (store_id, customer_id, customer_name, customer_phone, delivery_address, order_type, table_number, payment_method, payment_status, payment_instructions, delivery_fee, total, notes, form_answers, tracking_token, idempotency_key, source) VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, 'UNPAID', $8::jsonb, NULL, $9, $10, $11::jsonb, $12, $13, $14) RETURNING id`,
+      `INSERT INTO orders (store_id, customer_id, customer_name, customer_phone, delivery_address, order_type, table_number, scheduled_for, payment_method, payment_status, payment_instructions, delivery_fee, total, notes, form_answers, tracking_token, idempotency_key, source) VALUES ($1, NULL, $2, $3, $4, $5, $6, $7::timestamptz, $8, 'UNPAID', $9::jsonb, NULL, $10, $11, $12::jsonb, $13, $14, $15) RETURNING id`,
       [
         store.id,
         input.customerName,
@@ -250,6 +251,7 @@ async function createOrder(
         input.deliveryAddress || null,
         input.orderType,
         input.orderType === "DINE_IN" ? input.tableNumber || null : null,
+        input.scheduledFor ?? null,
         input.paymentMethod,
         paymentInstructions ? JSON.stringify(paymentInstructions) : null,
         amount(totalCents),
@@ -306,7 +308,7 @@ export function createManualOrder(
 
 export async function getPublicOrder(trackingToken: string) {
   const result = await pool.query(
-    `SELECT o.id, o.store_id AS "storeId", s.name AS "storeName", s.slug AS "storeSlug", s.order_workflow AS "orderWorkflow", o.status, o.order_type AS "orderType", o.table_number AS "tableNumber", o.payment_method AS "paymentMethod", o.payment_status AS "paymentStatus", o.payment_instructions AS "paymentInstructions", o.form_answers AS "formAnswers", COALESCE((SELECT SUM(oi.subtotal) FROM order_items oi WHERE oi.order_id = o.id), 0)::text AS "itemsSubtotal", o.total, o.delivery_fee AS "deliveryFee", o.created_at AS "createdAt" FROM orders o JOIN stores s ON s.id = o.store_id WHERE o.tracking_token = $1`,
+    `SELECT o.id, o.store_id AS "storeId", s.name AS "storeName", s.slug AS "storeSlug", s.order_workflow AS "orderWorkflow", o.status, o.order_type AS "orderType", o.table_number AS "tableNumber", o.scheduled_for AS "scheduledFor", o.payment_method AS "paymentMethod", o.payment_status AS "paymentStatus", o.payment_instructions AS "paymentInstructions", o.form_answers AS "formAnswers", COALESCE((SELECT SUM(oi.subtotal) FROM order_items oi WHERE oi.order_id = o.id), 0)::text AS "itemsSubtotal", o.total, o.delivery_fee AS "deliveryFee", o.created_at AS "createdAt" FROM orders o JOIN stores s ON s.id = o.store_id WHERE o.tracking_token = $1`,
     [trackingToken],
   );
   if (!result.rows[0]) throw new AppError(404, "Order not found");
@@ -359,13 +361,13 @@ export async function getStoreOverview(
     ),
     pool.query<{ date: string; sales: string }>(
       `WITH days AS (
-        SELECT generate_series((now() AT TIME ZONE 'Asia/Manila')::date - 6, (now() AT TIME ZONE 'Asia/Manila')::date, interval '1 day')::date AS day
+        SELECT generate_series($2::date, $3::date, interval '1 day')::date AS day
       )
       SELECT to_char(days.day, 'YYYY-MM-DD') AS date, COALESCE(SUM(o.total), 0)::text AS sales
       FROM days LEFT JOIN orders o ON o.store_id = $1 AND o.status = 'COMPLETED'
         AND (o.created_at AT TIME ZONE 'Asia/Manila')::date = days.day
       GROUP BY days.day ORDER BY days.day`,
-      [storeId],
+      [storeId, range.from, range.to],
     ),
     pool.query<{
       productId: string;
@@ -377,9 +379,10 @@ export async function getStoreOverview(
         SUM(oi.quantity)::int AS units, SUM(oi.subtotal)::text AS revenue
       FROM order_items oi JOIN orders o ON o.id = oi.order_id
       WHERE o.store_id = $1 AND o.status = 'COMPLETED'
-        AND (o.created_at AT TIME ZONE 'Asia/Manila')::date >= (now() AT TIME ZONE 'Asia/Manila')::date - 6
+        AND (o.created_at AT TIME ZONE 'Asia/Manila')::date >= $2::date
+        AND (o.created_at AT TIME ZONE 'Asia/Manila')::date <= $3::date
       GROUP BY oi.product_id ORDER BY units DESC, revenue DESC, name ASC LIMIT 5`,
-      [storeId],
+      [storeId, range.from, range.to],
     ),
   ]);
 
@@ -396,9 +399,10 @@ export async function getStoreOverview(
 
 type OwnerOrderRow = Omit<
   OwnerOrder,
-  "createdAt" | "items" | "attachments" | "paymentProof"
+  "createdAt" | "scheduledFor" | "items" | "attachments" | "paymentProof"
 > & {
   createdAt: Date;
+  scheduledFor: Date | null;
   cursorTime?: string;
 };
 
@@ -445,6 +449,7 @@ async function withOrderItems(orders: OwnerOrderRow[]): Promise<OwnerOrder[]> {
   return orders.map(({ cursorTime: _cursorTime, ...order }) => ({
     ...order,
     createdAt: order.createdAt.toISOString(),
+    scheduledFor: order.scheduledFor?.toISOString() ?? null,
     items: itemsByOrder.get(order.id) ?? [],
     attachments: attachmentsByOrder.get(order.id) ?? [],
     paymentProof: proofsByOrder.get(order.id) ?? null,
@@ -574,7 +579,7 @@ export async function getOwnerOrderAttachment(
   return attachment;
 }
 
-const ownerOrderColumns = `o.id, o.store_id AS "storeId", s.name AS "storeName", o.status, o.order_type AS "orderType", o.payment_method AS "paymentMethod", o.payment_status AS "paymentStatus", o.source, o.table_number AS "tableNumber", o.customer_name AS "customerName", o.customer_phone AS "customerPhone", o.delivery_address AS "deliveryAddress", o.delivery_fee AS "deliveryFee", COALESCE(SUM(oi.subtotal), 0)::text AS subtotal, o.total::text AS total, o.notes, o.form_answers AS "formAnswers", o.created_at AS "createdAt"`;
+const ownerOrderColumns = `o.id, o.store_id AS "storeId", s.name AS "storeName", o.status, o.order_type AS "orderType", o.payment_method AS "paymentMethod", o.payment_status AS "paymentStatus", o.source, o.table_number AS "tableNumber", o.customer_name AS "customerName", o.customer_phone AS "customerPhone", o.delivery_address AS "deliveryAddress", o.delivery_fee AS "deliveryFee", o.scheduled_for AS "scheduledFor", COALESCE(SUM(oi.subtotal), 0)::text AS subtotal, o.total::text AS total, o.notes, o.form_answers AS "formAnswers", o.created_at AS "createdAt"`;
 
 export async function listOwnerOrders(ownerId: string, storeId?: string) {
   const result = await pool.query<OwnerOrderRow>(
@@ -668,10 +673,11 @@ export async function updateOwnerOrderPayment(
   return transaction(async (client) => {
     const result = await client.query<{
       storeId: string;
+      trackingToken: string;
       orderType: string;
       deliveryFee: string | null;
     }>(
-      `SELECT o.store_id AS "storeId", o.order_type AS "orderType", o.delivery_fee AS "deliveryFee" FROM orders o JOIN stores s ON s.id = o.store_id WHERE o.id = $1 AND s.owner_id = $2 FOR UPDATE OF o`,
+      `SELECT o.store_id AS "storeId", o.tracking_token AS "trackingToken", o.order_type AS "orderType", o.delivery_fee AS "deliveryFee" FROM orders o JOIN stores s ON s.id = o.store_id WHERE o.id = $1 AND s.owner_id = $2 FOR UPDATE OF o`,
       [orderId, ownerId],
     );
     const order = result.rows[0];
@@ -689,7 +695,7 @@ export async function updateOwnerOrderPayment(
       orderId,
       paymentStatus,
     ]);
-    return { storeId: order.storeId };
+    return { storeId: order.storeId, trackingToken: order.trackingToken };
   });
 }
 
@@ -701,11 +707,12 @@ export async function updateOwnerOrder(
   return transaction(async (client) => {
     const result = await client.query<{
       storeId: string;
+      trackingToken: string;
       status: string;
       orderType: string;
       deliveryFee: string | null;
     }>(
-      `SELECT o.store_id AS "storeId", o.status, o.order_type AS "orderType", o.delivery_fee AS "deliveryFee" FROM orders o JOIN stores s ON s.id = o.store_id WHERE o.id = $1 AND s.owner_id = $2 FOR UPDATE OF o`,
+      `SELECT o.store_id AS "storeId", o.tracking_token AS "trackingToken", o.status, o.order_type AS "orderType", o.delivery_fee AS "deliveryFee" FROM orders o JOIN stores s ON s.id = o.store_id WHERE o.id = $1 AND s.owner_id = $2 FOR UPDATE OF o`,
       [orderId, ownerId],
     );
     const order = result.rows[0];
@@ -751,6 +758,10 @@ export async function updateOwnerOrder(
       `UPDATE orders SET status = $2, delivery_fee = COALESCE($3::numeric, delivery_fee), total = total + COALESCE($3::numeric, 0) WHERE id = $1`,
       [orderId, input.status, input.deliveryFee ?? null],
     );
-    return { storeId: order.storeId };
+    return {
+      storeId: order.storeId,
+      trackingToken: order.trackingToken,
+      previousStatus: order.status,
+    };
   });
 }

@@ -106,6 +106,14 @@ function formatPlacedAt(value: string) {
   });
 }
 
+function formatScheduledFor(value: string) {
+  return new Intl.DateTimeFormat("en-PH", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Manila",
+  }).format(new Date(value));
+}
+
 function cents(value: number) {
   return Math.round(value * 100);
 }
@@ -258,6 +266,12 @@ function OrderRow({
         {order.orderType === "DELIVERY" && order.deliveryAddress && (
           <p className="mt-1 break-words text-sm text-muted-foreground">
             {order.deliveryAddress}
+          </p>
+        )}
+        {order.scheduledFor && (
+          <p className="mt-2 text-sm font-medium text-primary">
+            Requested for {formatScheduledFor(order.scheduledFor)} Philippine
+            time
           </p>
         )}
 

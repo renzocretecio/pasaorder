@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { io } from "socket.io-client";
 import {
   ChevronDown,
+  ChartNoAxesCombined,
   LayoutDashboard,
   Plus,
   ShoppingBag,
@@ -34,6 +35,7 @@ export function WorkspaceNavigation({
   const creating = pathname === "/dashboard/new";
   const orders = pathname.endsWith("/orders");
   const overview = pathname.endsWith("/overview");
+  const reports = pathname.endsWith("/reports");
   const routeStoreId = pathname.match(/^\/dashboard\/stores\/([^/]+)/)?.[1];
   const selectedStore =
     stores.find((store) => store.id === routeStoreId) ??
@@ -102,7 +104,7 @@ export function WorkspaceNavigation({
     });
     socket.on("orders:changed", (event: { storeId?: string }) => {
       if (
-        overview &&
+        (overview || reports) &&
         event.storeId === selectedStoreId &&
         document.visibilityState === "visible"
       )
@@ -122,7 +124,7 @@ export function WorkspaceNavigation({
       document.removeEventListener("visibilitychange", refreshWhenVisible);
       socket.disconnect();
     };
-  }, [overview, router, selectedStoreId]);
+  }, [overview, reports, router, selectedStoreId]);
 
   function chooseDefault(storeId: string) {
     setMessage("");
@@ -142,10 +144,18 @@ export function WorkspaceNavigation({
       count: 0,
     },
     {
+      href: selectedStore ? `${catalogHref}/reports` : "/dashboard",
+      label: "Reports",
+      icon: ChartNoAxesCombined,
+      active: Boolean(selectedStore) && reports,
+      count: 0,
+    },
+    {
       href: catalogHref,
       label: "Catalog",
       icon: Store,
-      active: Boolean(selectedStore) && !creating && !orders && !overview,
+      active:
+        Boolean(selectedStore) && !creating && !orders && !overview && !reports,
       count: 0,
     },
     {
@@ -340,7 +350,7 @@ export function WorkspaceNavigation({
       </header>
       <nav
         aria-label="Store workspace"
-        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-3 border-t bg-card pt-2 pl-[max(.5rem,env(safe-area-inset-left))] pr-[max(.5rem,env(safe-area-inset-right))] pb-[max(.5rem,env(safe-area-inset-bottom))] md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t bg-card pt-2 pl-[max(.5rem,env(safe-area-inset-left))] pr-[max(.5rem,env(safe-area-inset-right))] pb-[max(.5rem,env(safe-area-inset-bottom))] md:hidden"
       >
         {links.map(({ href, label, icon: Icon, active, count }) => (
           <Link

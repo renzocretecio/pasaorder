@@ -208,6 +208,7 @@ export const orders = pgTable("orders", {
   source: orderSourceEnum("source").notNull().default("MENU"),
   paymentInstructions: jsonb("payment_instructions"),
   deliveryFee: numeric("delivery_fee", { precision: 10, scale: 2 }),
+  scheduledFor: timestamp("scheduled_for", { withTimezone: true }),
   total: numeric("total", { precision: 10, scale: 2 }).notNull().default("0"),
   notes: text("notes"),
   formAnswers: jsonb("form_answers").notNull().default([]),
@@ -215,6 +216,43 @@ export const orders = pgTable("orders", {
     .notNull()
     .defaultNow(),
 });
+
+export const ownerPushSubscriptions = pgTable("owner_push_subscriptions", {
+  id: bigint("id", { mode: "bigint" }).primaryKey().generatedAlwaysAsIdentity(),
+  ownerId: bigint("owner_id", { mode: "bigint" })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const customerPushSubscriptions = pgTable(
+  "customer_push_subscriptions",
+  {
+    id: bigint("id", { mode: "bigint" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity(),
+    orderId: bigint("order_id", { mode: "bigint" })
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    endpoint: text("endpoint").notNull(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("customer_push_subscriptions_order_endpoint_unique").on(
+      table.orderId,
+      table.endpoint,
+    ),
+  ],
+);
 
 export const chatOrderDrafts = pgTable(
   "chat_order_drafts",

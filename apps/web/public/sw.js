@@ -37,3 +37,50 @@ self.addEventListener("fetch", (event) => {
     }),
   );
 });
+
+self.addEventListener("push", (event) => {
+  let notification = {};
+  try {
+    notification = event.data ? event.data.json() : {};
+  } catch {
+    notification = { title: "PasaOrder", body: "You have an order update." };
+  }
+  const title =
+    typeof notification.title === "string" ? notification.title : "PasaOrder";
+  const body =
+    typeof notification.body === "string"
+      ? notification.body
+      : "You have an order update.";
+  const url =
+    typeof notification.url === "string" &&
+    notification.url.startsWith("/") &&
+    !notification.url.startsWith("//")
+      ? notification.url
+      : "/login";
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: "/pwa-icon/192",
+      badge: "/pwa-icon/192",
+      data: { url },
+      tag: `pasaorder-${url}`,
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url;
+  if (typeof url !== "string" || !url.startsWith("/") || url.startsWith("//"))
+    return;
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then(async (clients) => {
+        const target = new URL(url, self.location.origin).href;
+        const existing = clients.find((client) => client.url === target);
+        if (existing) return existing.focus();
+        return self.clients.openWindow(target);
+      }),
+  );
+});

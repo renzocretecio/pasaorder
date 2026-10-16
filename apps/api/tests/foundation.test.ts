@@ -376,6 +376,27 @@ test("mobile numbers are optional for checkout while delivery still needs an add
     true,
   );
   assert.equal(createOrderSchema.safeParse(dineInOrder).success, true);
+  const scheduledFor = new Date(Date.now() + 60 * 60_000).toISOString();
+  assert.equal(
+    createOrderSchema.safeParse({
+      ...dineInOrder,
+      orderType: "PICKUP",
+      scheduledFor,
+    }).success,
+    true,
+  );
+  assert.equal(
+    createOrderSchema.safeParse({ ...dineInOrder, scheduledFor }).success,
+    false,
+  );
+  assert.equal(
+    createOrderSchema.safeParse({
+      ...dineInOrder,
+      orderType: "PICKUP",
+      scheduledFor: new Date(Date.now() - 60_000).toISOString(),
+    }).success,
+    false,
+  );
   assert.equal(
     createOrderSchema.safeParse({ ...dineInOrder, paymentMethod: "CRYPTO" })
       .success,
