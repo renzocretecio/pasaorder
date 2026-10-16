@@ -7,8 +7,11 @@ import type {
   PaymentInstructions,
   PaymentMethod,
   PaymentStatus,
+  OrderWorkflow,
+  StoreOrderAnswer,
 } from "@pasaorder/types";
 import { CopyPaymentDetails } from "@/features/catalog/copy-payment-details";
+import { PaymentProofUpload } from "@/features/orders/payment-proof-upload";
 
 export const metadata: Metadata = {
   title: "Order status | PasaOrder",
@@ -22,6 +25,7 @@ type TrackedOrder = {
   status:
     "NEW" | "CONFIRMED" | "PREPARING" | "READY" | "COMPLETED" | "CANCELLED";
   orderType: "DINE_IN" | "PICKUP" | "DELIVERY";
+  orderWorkflow: OrderWorkflow;
   tableNumber: string | null;
   itemsSubtotal: string;
   total: string;
@@ -29,17 +33,22 @@ type TrackedOrder = {
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
   paymentInstructions: PaymentInstructions | null;
+  paymentProof: { uploadedAt: string } | null;
+  formAnswers: StoreOrderAnswer[];
   createdAt: string;
   items: {
     productName: string;
+    productType: "PHYSICAL" | "MADE_TO_ORDER" | "SERVICE";
     optionLabel: string | null;
+    productAnswers: StoreOrderAnswer[];
+    addOns: { groupName: string; optionName: string; price: string }[];
     quantity: number;
     unitPrice: string;
     subtotal: string;
   }[];
 };
 
-const statusLabels: Record<TrackedOrder["status"], string> = {
+const defaultStatusLabels: Record<TrackedOrder["status"], string> = {
   NEW: "Waiting for store review",
   CONFIRMED: "Confirmed",
   PREPARING: "Preparing",
@@ -70,6 +79,7 @@ export default async function OrderTrackingPage({
     if (error instanceof ApiError && error.status === 404) notFound();
     throw error;
   }
+  const statusLabels = order.orderWorkflow?.labels ?? defaultStatusLabels;
 
   return (
     <main className="min-h-dvh bg-[#f6f5ef] px-4 py-8 text-[#18251d] sm:py-14">
@@ -113,8 +123,35 @@ export default async function OrderTrackingPage({
                   <p className="font-medium">
                     {item.quantity} × {item.productName}
                   </p>
+                  {item.productType !== "PHYSICAL" && (
+                    <p className="mt-1 text-[#59685d]">
+                      {item.productType === "MADE_TO_ORDER"
+                        ? "Made to order"
+                        : "Service"}
+                    </p>
+                  )}
                   {item.optionLabel && (
                     <p className="mt-1 text-[#59685d]">{item.optionLabel}</p>
+                  )}
+                  {item.addOns.length > 0 && (
+                    <p className="mt-1 text-[#59685d]">
+                      Options:{" "}
+                      {item.addOns.map((addon) => addon.optionName).join(", ")}
+                    </p>
+                  )}
+                  {item.productAnswers.length > 0 && (
+                    <div className="mt-1 space-y-1 text-[#59685d]">
+                      {item.productAnswers.map((answer) => (
+                        <p key={answer.questionId}>
+                          {answer.label}:{" "}
+                          {answer.value === "true"
+                            ? "Yes"
+                            : answer.value === "false"
+                              ? "No"
+                              : answer.value}
+                        </p>
+                      ))}
+                    </div>
                   )}
                 </div>
                 <span className="shrink-0 tabular-nums">
@@ -123,6 +160,16 @@ export default async function OrderTrackingPage({
               </li>
             ))}
           </ul>
+          {order.formAnswers?.length > 0 && (
+            <div className="mt-4 space-y-2 border-t border-[#e4e9e2] pt-4">
+              {order.formAnswers.map((answer) => (
+                <p key={answer.questionId} className="text-sm">
+                  <span className="text-[#59685d]">{answer.label}: </span>
+                  {answer.value}
+                </p>
+              ))}
+            </div>
+          )}
           <div className="mt-3 flex justify-between border-t border-[#d6dfd6] pt-4 text-sm font-semibold">
             <span>
               {order.orderType === "DELIVERY" ? "Items subtotal" : "Total"}
@@ -238,6 +285,16 @@ export default async function OrderTrackingPage({
             )}
           {order.paymentMethod === "GCASH" &&
             order.paymentStatus === "UNPAID" &&
+            order.status !== "NEW" &&
+            order.status !== "CANCELLED" &&
+            !(order.orderType === "DELIVERY" && order.deliveryFee === null) && (
+              <PaymentProofUpload
+                trackingToken={trackingToken}
+                uploadedAt={order.paymentProof?.uploadedAt ?? null}
+              />
+            )}
+          {order.paymentMethod === "GCASH" &&
+            order.paymentStatus === "UNPAID" &&
             order.status === "CANCELLED" && (
               <p className="mt-3 text-sm leading-relaxed text-[#59685d]">
                 This order was cancelled. Contact the store if you already sent
@@ -256,7 +313,7 @@ export default async function OrderTrackingPage({
           href={`/menu/${order.storeSlug}`}
           className="mt-5 inline-flex min-h-11 items-center text-sm font-semibold text-[#244d35] underline underline-offset-4"
         >
-          Back to the menu
+          Back to the catalog
         </Link>
       </div>
     </main>

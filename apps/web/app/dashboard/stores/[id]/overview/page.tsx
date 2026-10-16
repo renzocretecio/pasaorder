@@ -1,17 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import {
-  ArrowRight,
-  ArrowUpRight,
-  MessageSquareText,
-  ShoppingBag,
-} from "lucide-react";
-import type {
-  ChatOrderDraftSummary,
-  OrderStatus,
-  OwnerOrder,
-  StoreOverview,
-} from "@pasaorder/types";
+import { ArrowRight, ArrowUpRight, ShoppingBag } from "lucide-react";
+import type { OrderStatus, OwnerOrder, StoreOverview } from "@pasaorder/types";
 import { overviewDateRangeSchema } from "@pasaorder/validation";
 import { peso } from "@/features/catalog/color";
 import { OverviewRefresh } from "@/features/orders/overview-refresh";
@@ -21,14 +11,6 @@ import { getOwnerCatalog, ownerApi } from "@/lib/catalog";
 
 export const metadata: Metadata = { title: "Overview | PasaOrder" };
 
-const statusLabel: Record<OrderStatus, string> = {
-  NEW: "New",
-  CONFIRMED: "Confirmed",
-  PREPARING: "Preparing",
-  READY: "Ready",
-  COMPLETED: "Completed",
-  CANCELLED: "Cancelled",
-};
 const statusStyle: Record<OrderStatus, string> = {
   NEW: "bg-amber-50 text-amber-900",
   CONFIRMED: "bg-secondary text-primary",
@@ -111,32 +93,16 @@ export default async function StoreOverviewPage({
   const rangeQuery = selectedRange?.success
     ? `?${new URLSearchParams(selectedRange.data)}`
     : "";
-  const [{ store }, { overview }, { orders }, { drafts }] = await Promise.all([
+  const [{ store }, { overview }, { orders }] = await Promise.all([
     getOwnerCatalog(id),
     ownerApi<{ overview: StoreOverview }>(
       `/orders/stores/${id}/overview${rangeQuery}`,
     ),
     ownerApi<{ orders: OwnerOrder[] }>(`/orders/stores/${id}/recent-orders`),
-    ownerApi<{ drafts: ChatOrderDraftSummary[] }>(
-      `/orders/stores/${id}/chat-drafts`,
-    ),
   ]);
   const base = `/dashboard/stores/${id}`;
-  const rangeStart = new Date(`${overview.from}T00:00:00+08:00`).getTime();
-  const rangeEnd =
-    new Date(`${overview.to}T00:00:00+08:00`).getTime() + 86_400_000;
   const isToday =
     overview.from === overview.date && overview.to === overview.date;
-  const possibleInRange = drafts.filter(
-    (draft) =>
-      draft.inboxBucket === "POSSIBLE_ORDER" &&
-      new Date(draft.updatedAt).getTime() >= rangeStart &&
-      new Date(draft.updatedAt).getTime() < rangeEnd,
-  );
-  const possibleCount = possibleInRange.length;
-  const attentionCount = drafts.filter(
-    (draft) => draft.inboxBucket === "NEEDS_ATTENTION",
-  ).length;
   const dateLabel = new Date(`${overview.date}T12:00:00Z`).toLocaleDateString(
     "en-PH",
     {
@@ -202,14 +168,14 @@ export default async function StoreOverviewPage({
           href={`${base}/orders?queue=NEW`}
         />
         <Metric
-          label="Possible orders"
-          value={possibleCount}
-          detail="Open chats updated in range"
-          href={`${base}/chat-orders?filter=POSSIBLE_ORDER`}
+          label="Awaiting confirmation"
+          value={overview.awaitingConfirmation}
+          detail="New orders waiting for your review"
+          href={`${base}/orders?queue=NEW`}
         />
       </section>
 
-      <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,1.5fr)_minmax(18rem,1fr)]">
+      <div className="max-w-5xl">
         <section aria-labelledby="recent-orders-title" className="min-w-0">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
@@ -251,7 +217,7 @@ export default async function StoreOverviewPage({
                           <span
                             className={`rounded-md px-2 py-0.5 text-xs font-medium ${statusStyle[order.status]}`}
                           >
-                            {statusLabel[order.status]}
+                            {store.orderWorkflow.labels[order.status]}
                           </span>
                           <span className="text-xs text-muted-foreground">
                             {orderTime(order.createdAt)}
@@ -289,81 +255,10 @@ export default async function StoreOverviewPage({
                 />
                 <p className="mt-3 text-sm font-semibold">No orders yet</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Orders from your published menu and customer chats will appear
-                  here.
+                  Orders from your published catalog will appear here.
                 </p>
               </div>
             )}
-          </div>
-        </section>
-
-        <section aria-labelledby="conversations-title" className="min-w-0">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div>
-              <h2
-                id="conversations-title"
-                className="text-lg font-semibold tracking-[-0.01em]"
-              >
-                Conversations
-              </h2>
-              <p className="mt-1 text-[13px] text-muted-foreground">
-                Chats waiting for review or reply
-              </p>
-            </div>
-            <Link
-              href={`${base}/chat-orders`}
-              className="inline-flex min-h-11 shrink-0 items-center gap-1 text-sm font-semibold text-primary hover:underline focus-visible:outline-2 focus-visible:outline-ring"
-            >
-              All chats <ArrowRight className="size-4" aria-hidden="true" />
-            </Link>
-          </div>
-          <div className="overflow-hidden rounded-xl border bg-card divide-y">
-            <Link
-              href={`${base}/chat-orders?filter=POSSIBLE_ORDER`}
-              className="flex min-h-20 items-center gap-4 px-4 py-4 transition-colors hover:bg-secondary/40 focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-ring sm:px-5"
-            >
-              <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-secondary text-primary">
-                <ShoppingBag className="size-4" aria-hidden="true" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold">
-                  Possible orders
-                </span>
-                <span className="mt-0.5 block text-xs text-muted-foreground">
-                  Review customer order requests
-                </span>
-              </span>
-              <strong className="text-xl font-semibold tabular-nums">
-                {possibleCount}
-              </strong>
-              <ArrowRight
-                className="size-4 shrink-0 text-primary"
-                aria-hidden="true"
-              />
-            </Link>
-            <Link
-              href={`${base}/chat-orders?filter=NEEDS_ATTENTION`}
-              className="flex min-h-20 items-center gap-4 px-4 py-4 transition-colors hover:bg-secondary/40 focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-ring sm:px-5"
-            >
-              <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-amber-50 text-amber-900">
-                <MessageSquareText className="size-4" aria-hidden="true" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold">
-                  Needs attention
-                </span>
-                <span className="mt-0.5 block text-xs text-muted-foreground">
-                  Reply or handle manually
-                </span>
-              </span>
-              <strong className="text-xl font-semibold tabular-nums">
-                {attentionCount}
-              </strong>
-              <ArrowRight
-                className="size-4 shrink-0 text-primary"
-                aria-hidden="true"
-              />
-            </Link>
           </div>
         </section>
       </div>

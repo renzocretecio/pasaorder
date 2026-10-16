@@ -101,10 +101,6 @@ export function emitOrdersChanged(storeId: string) {
   io?.to(`store:${storeId}`).emit("orders:changed", { storeId });
 }
 
-export function emitChatsChanged(storeId: string) {
-  io?.to(`store:${storeId}`).emit("chats:changed", { storeId });
-}
-
 export function disconnectOwnerSockets(userId: string) {
   io?.in(`owner:${userId}`).disconnectSockets(true);
 }

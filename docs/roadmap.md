@@ -1,11 +1,67 @@
-# Implementation roadmap
+# PasaOrder MVP checklist
 
-1. **Foundation (implemented):** workspace configuration, environment examples/setup, shared DB boundary, authentication/tenant protection, centralized errors, development database, CI, regression tests.
-2. **Catalog (implemented):** store setup, permanent menu slug, categories, items with optional size/piece variants and individual prices, OCI image uploads or public HTTPS image links, availability, accent customization, private preview, publication, public mobile catalog, and downloadable menu QR. Custom modifiers remain planned.
-3. **Public ordering (implemented):** guest checkout, transactional server-side totals, item snapshots, idempotency, and private tracking tokens. Checkout supports the store's configured fulfillment types; delivery fees are entered by the store during confirmation.
-4. **Operations (basic order queue implemented):** owner-wide order inbox, status progression, delivery fee entry, order history, and live Socket.IO refreshes. Store payment options, Cash/GCash checkout selection, snapshotted GCash instructions, and manual payment status verification are implemented. Add database quantity/amount constraints and foreign-key indexes as part of reviewed schema migrations.
-5. **Assisted chat (public test chat, Messenger and Instagram intake, owner replies, ThinkLess triage, and owner-reviewed Gemini extraction implemented):** receive customer messages from `/chat/[store-slug]`, connected Facebook Pages, and linked Instagram professional accounts; use the private classifier to place conversations in Possible order, Needs attention, or a quiet All-only state; then let the owner review and confirm an editable catalog-matched order. Messenger profile names and Instagram usernames are fetched when Meta makes them available, and owners can reply through connected accounts within Meta's messaging window. Changes and cancellations remain owner-reviewed. The pasted-conversation creation UI has been removed; existing imported drafts remain reviewable. The public test chat has no store replies or post-order follow-ups yet; classification and extraction accuracy on Tagalog/English corrections still needs evaluation.
-6. **Meta integrations:** validate permissions/onboarding with a pilot merchant, verified durable webhooks, retry queue, deduplication, conversation state, messaging-window enforcement, human handoff.
-7. **Automation/premium:** benchmark ThinkLess decisions and Gemini extraction on labeled real chat examples, meter costs and usage, add billing/entitlements, and automate only workflows supported by measured accuracy.
+Completed items are checked. Unchecked items are not part of the current product yet.
 
-The first publishable catalog, guest checkout, and basic owner order handling are available. Payment methods are manual; gateway processing and automatic payment verification are not implemented.
+## 1. Business Storefront
+
+- [x] Choose business type
+- [x] Add business name, logo, and description
+- [x] Add and manage products or services
+- [x] Set prices and availability
+- [x] Share storefront through a link or QR code
+
+## 2. Products & Options
+
+- [x] Add product images and descriptions
+- [x] Add product options (size, color, flavor, etc.)
+- [x] Set prices for different options
+- [x] Enable or disable products
+
+## 3. Customer Ordering
+
+- [x] Browse products and services
+- [x] Add items to cart
+- [x] Choose pickup or delivery (dine-in is also supported)
+- [x] Add order notes
+- [x] Enter customer contact details
+- [x] Place an order without creating an account
+
+## 4. Order Management
+
+- [x] View incoming orders
+- [x] Accept or cancel orders
+- [x] Update order status
+- [x] View customer details and order notes
+- [x] Let customers track their orders
+
+## 5. Payments
+
+- [x] Show available payment methods
+- [x] Support cash on pickup or delivery
+- [x] Display GCash payment instructions or QR code
+- [x] Allow customers to upload payment proof
+- [x] Let businesses confirm payments manually
+
+## 6. Business Dashboard
+
+- [x] Show today's orders and sales
+- [x] View order history
+- [x] See best-selling products
+- [x] Show basic sales reports
+
+## 7. Business Settings
+
+- [x] Set business hours
+- [x] Configure pickup and delivery options
+- [x] Customize storefront appearance
+- [x] Manage business contact information
+
+## Features to leave out for now
+
+- Chat-to-Order and Meta messaging integrations
+- Customer Questions and custom checkout forms; use product options and order notes
+- Advanced inventory management
+- AI features
+- Complex workflow builders
+
+The MVP focuses on helping business owners create a storefront, receive orders, and manage orders. Legacy records for removed features are retained where needed for existing orders and data compatibility, but those features are not part of the active customer flow.

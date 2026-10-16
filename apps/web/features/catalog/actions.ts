@@ -67,6 +67,15 @@ export async function saveCatalogOrder(
     };
   }
 }
+function parseJsonField<T>(value: string | undefined, fallback: T): T {
+  if (!value) return fallback;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
+}
+
 async function mutateCatalog(
   operation: CatalogOperation,
   storeId: string,
@@ -152,6 +161,7 @@ async function mutateCatalog(
   });
   const common = {
     name: values.name ?? "",
+    businessCategory: values.businessCategory ?? "OTHER",
     description: values.description ?? "",
     contactPhone: values.contactPhone ?? "",
     address: values.address ?? "",
@@ -178,6 +188,18 @@ async function mutateCatalog(
       ? ""
       : (values.bannerUrl ?? ""),
     accentColor: values.accentColor ?? "#244d35",
+    orderQuestions: parseJsonField(values.orderQuestions, []),
+    orderWorkflow: parseJsonField(values.orderWorkflow, {
+      template: "STANDARD",
+      labels: {
+        NEW: "New",
+        CONFIRMED: "Confirmed",
+        PREPARING: "Preparing",
+        READY: "Ready",
+        COMPLETED: "Completed",
+        CANCELLED: "Cancelled",
+      },
+    }),
   };
   let parsed;
   if (operation === "setup")
@@ -196,8 +218,11 @@ async function mutateCatalog(
     parsed = catalogItemSchema.safeParse({
       categoryId: values.categoryId ?? "",
       name: values.name ?? "",
+      productType: values.productType ?? "PHYSICAL",
       description: values.description ?? "",
       ...(values.price ? { price: values.price } : {}),
+      addOnGroups: parseJsonField(values.addOnGroups, []),
+      orderQuestions: parseJsonField(values.orderQuestions, []),
       variants: data.getAll("variantLabel").map((label, index) => {
         const id = String(data.getAll("variantId")[index] ?? "");
         return {
@@ -287,7 +312,7 @@ async function mutateCatalog(
       message:
         error instanceof ApiError
           ? error.status === 409 && operation === "setup"
-            ? "That menu link is taken. Choose another slug."
+            ? "That storefront link is taken. Choose another slug."
             : error.message
           : "Couldn’t save. Please try again.",
       values,
@@ -303,7 +328,7 @@ async function mutateCatalog(
     message:
       operation === "publication"
         ? values.isPublished === "true"
-          ? "Catalog published. Your menu link is live."
+          ? "Catalog published. Your storefront link is live."
           : "Catalog unpublished. Only you can preview it."
         : "Saved successfully.",
   };

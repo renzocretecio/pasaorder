@@ -12,7 +12,6 @@ export default function robots(): MetadataRoute.Robots {
         "/dashboard",
         "/login",
         "/register",
-        "/chat/",
         "/order/",
       ],
     },

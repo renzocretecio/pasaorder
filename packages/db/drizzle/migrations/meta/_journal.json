@@ -162,6 +162,48 @@
       "when": 1792025424398,
       "tag": "0022_perpetual_ricochet",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1792100024027,
+      "tag": "0023_smart_order_forms",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1792100768878,
+      "tag": "0024_configurable_order_workflows",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1792101785279,
+      "tag": "0025_stormy_the_watchers",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1792104346266,
+      "tag": "0026_wide_enchantress",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1792106985886,
+      "tag": "0027_cuddly_mongoose",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1792109001522,
+      "tag": "0028_spicy_rafael_vega",
+      "breakpoints": true
     }
   ]
 }

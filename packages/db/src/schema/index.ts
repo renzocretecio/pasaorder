@@ -11,6 +11,7 @@ import {
   text,
   timestamp,
   uniqueIndex,
+  uuid,
   varchar,
 } from "drizzle-orm/pg-core";
 
@@ -79,6 +80,9 @@ export const stores = pgTable("stores", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
+  businessCategory: varchar("business_category", { length: 32 })
+    .notNull()
+    .default("OTHER"),
   slug: varchar("slug", { length: 120 }).notNull().unique(),
   description: text("description"),
   contactPhone: varchar("contact_phone", { length: 40 }),
@@ -102,6 +106,20 @@ export const stores = pgTable("stores", {
   accentColor: varchar("accent_color", { length: 7 })
     .notNull()
     .default("#244d35"),
+  orderQuestions: jsonb("order_questions").notNull().default([]),
+  orderWorkflow: jsonb("order_workflow")
+    .notNull()
+    .default({
+      template: "STANDARD",
+      labels: {
+        NEW: "New",
+        CONFIRMED: "Confirmed",
+        PREPARING: "Preparing",
+        READY: "Ready",
+        COMPLETED: "Completed",
+        CANCELLED: "Cancelled",
+      },
+    }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -135,7 +153,12 @@ export const products = pgTable("products", {
     .notNull()
     .references(() => categories.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
+  productType: varchar("product_type", { length: 32 })
+    .notNull()
+    .default("PHYSICAL"),
   description: text("description"),
+  addOnGroups: jsonb("add_on_groups").notNull().default([]),
+  orderQuestions: jsonb("order_questions").notNull().default([]),
   price: numeric("price", { precision: 10, scale: 2 }).notNull(),
   imageUrl: text("image_url"),
   isAvailable: boolean("is_available").notNull().default(true),
@@ -187,6 +210,7 @@ export const orders = pgTable("orders", {
   deliveryFee: numeric("delivery_fee", { precision: 10, scale: 2 }),
   total: numeric("total", { precision: 10, scale: 2 }).notNull().default("0"),
   notes: text("notes"),
+  formAnswers: jsonb("form_answers").notNull().default([]),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -287,12 +311,63 @@ export const orderItems = pgTable("order_items", {
     .notNull()
     .references(() => products.id, { onDelete: "restrict" }),
   productName: varchar("product_name", { length: 255 }).notNull(),
+  productType: varchar("product_type", { length: 32 })
+    .notNull()
+    .default("PHYSICAL"),
   optionLabel: varchar("option_label", { length: 80 }),
   specialInstructions: varchar("special_instructions", { length: 500 }),
+  addOns: jsonb("add_ons").notNull().default([]),
+  productAnswers: jsonb("product_answers").notNull().default([]),
   quantity: integer("quantity").notNull(),
   unitPrice: numeric("unit_price", { precision: 10, scale: 2 }).notNull(),
   subtotal: numeric("subtotal", { precision: 10, scale: 2 }).notNull(),
 });
+
+export const orderAttachments = pgTable(
+  "order_attachments",
+  {
+    id: uuid("id").primaryKey(),
+    orderId: bigint("order_id", { mode: "bigint" })
+      .notNull()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    orderItemId: bigint("order_item_id", { mode: "bigint" }).references(
+      () => orderItems.id,
+      { onDelete: "cascade" },
+    ),
+    questionId: varchar("question_id", { length: 36 }).notNull(),
+    questionLabel: varchar("question_label", { length: 100 }).notNull(),
+    objectKey: text("object_key").notNull().unique(),
+    fileName: varchar("file_name", { length: 160 }).notNull(),
+    contentType: varchar("content_type", { length: 64 }).notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("order_attachments_order_id_idx").on(table.orderId),
+    index("order_attachments_order_item_id_idx").on(table.orderItemId),
+  ],
+);
+
+export const paymentProofs = pgTable(
+  "payment_proofs",
+  {
+    id: uuid("id").primaryKey(),
+    orderId: bigint("order_id", { mode: "bigint" })
+      .notNull()
+      .unique()
+      .references(() => orders.id, { onDelete: "cascade" }),
+    objectKey: text("object_key").notNull().unique(),
+    fileName: varchar("file_name", { length: 160 }).notNull(),
+    contentType: varchar("content_type", { length: 64 }).notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("payment_proofs_order_id_idx").on(table.orderId)],
+);
 
 export const usersRelations = relations(users, ({ many }) => ({
   stores: many(stores),
@@ -368,5 +443,7 @@ export const schema = {
   productVariants,
   orders,
   orderItems,
+  orderAttachments,
+  paymentProofs,
   chatOrderDrafts,
 };

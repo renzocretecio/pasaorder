@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.WEB_ORIGIN ?? "http://localhost:3000"),
   title: "PasaOrder",
   description:
-    "Simple online menus and order management for small businesses. Accept orders from a QR menu, link, or customer chat.",
+    "Simple online storefronts and order management for small businesses. Accept orders from a QR code or shareable link.",
   applicationName: "PasaOrder",
   openGraph: {
     type: "website",

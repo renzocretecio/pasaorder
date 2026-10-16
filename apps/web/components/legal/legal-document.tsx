@@ -61,7 +61,7 @@ export function LegalDocument({
             {summary}
           </p>
           <p className="mt-5 text-sm text-[#59685d]">
-            Last updated October 12, 2026
+            Last updated October 16, 2026
           </p>
 
           <div className="mt-9 border-t border-[#d6dfd6]">
@@ -80,13 +80,6 @@ export function LegalDocument({
               </section>
             ))}
           </div>
-
-          <p className="mt-7 rounded-xl border border-[#d6dfd6] bg-white p-4 text-sm leading-6 text-[#59685d]">
-            Before public launch, replace the contact-email placeholder with an
-            address you monitor. These pages are a product draft, not legal
-            advice; have the final policies reviewed for your business and
-            applicable law.
-          </p>
         </article>
       </div>
 

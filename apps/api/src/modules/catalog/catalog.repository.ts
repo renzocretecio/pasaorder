@@ -5,12 +5,14 @@ import type {
   CatalogCategory,
   Product,
   ProductVariant,
+  ProductAddonGroup,
+  StoreOrderQuestion,
   WorkspaceStore,
 } from "@pasaorder/types";
 import type { CatalogImportInput } from "@pasaorder/validation";
 import { pool } from "../../db.js";
 import { AppError } from "../../middleware/errors.js";
-const storeFields = `s.id, s.name, s.slug, s.description, s.contact_phone AS "contactPhone", s.address, s.operating_hours AS "operatingHours", s.order_types AS "orderTypes", s.payment_methods AS "paymentMethods", s.gcash_account_name AS "gcashAccountName", s.gcash_number AS "gcashNumber", s.gcash_qr_url AS "gcashQrUrl", s.logo_url AS "logoUrl", s.banner_url AS "bannerUrl", s.is_active AS "isActive", s.is_published AS "isPublished", s.accent_color AS "accentColor"`;
+const storeFields = `s.id, s.name, s.business_category AS "businessCategory", s.slug, s.description, s.contact_phone AS "contactPhone", s.address, s.operating_hours AS "operatingHours", s.order_types AS "orderTypes", s.payment_methods AS "paymentMethods", s.gcash_account_name AS "gcashAccountName", s.gcash_number AS "gcashNumber", s.gcash_qr_url AS "gcashQrUrl", s.logo_url AS "logoUrl", s.banner_url AS "bannerUrl", s.is_active AS "isActive", s.is_published AS "isPublished", s.accent_color AS "accentColor", s.order_questions AS "orderQuestions", s.order_workflow AS "orderWorkflow"`;
 export async function transaction<T>(work: (client: PoolClient) => Promise<T>) {
   const client = await pool.connect();
   try {
@@ -40,7 +42,7 @@ export async function ownedStore(
 export async function listCatalogStores(ownerId: string) {
   return (
     await pool.query<WorkspaceStore>(
-      `SELECT ${storeFields}, COALESCE(op.default_store_id, (SELECT preferred.id FROM stores preferred WHERE preferred.owner_id = s.owner_id ORDER BY preferred.created_at DESC, preferred.id DESC LIMIT 1)) = s.id AS "isDefault", (SELECT count(*)::int FROM chat_order_drafts d WHERE d.store_id = s.id AND d.status = 'DRAFT' AND (d.source <> 'WEB_CHAT' OR d.chat_messages <> '[]'::jsonb) AND NOT COALESCE(d.decision @> '{"model":"thinkless","policyVersion":3,"bucket":"NORMAL"}'::jsonb, false)) AS "actionableChatCount" FROM stores s LEFT JOIN owner_preferences op ON op.owner_id = s.owner_id WHERE s.owner_id = $1 ORDER BY s.created_at DESC, s.id DESC`,
+      `SELECT ${storeFields}, COALESCE(op.default_store_id, (SELECT preferred.id FROM stores preferred WHERE preferred.owner_id = s.owner_id ORDER BY preferred.created_at DESC, preferred.id DESC LIMIT 1)) = s.id AS "isDefault" FROM stores s LEFT JOIN owner_preferences op ON op.owner_id = s.owner_id WHERE s.owner_id = $1 ORDER BY s.created_at DESC, s.id DESC`,
       [ownerId],
     )
   ).rows;
@@ -69,7 +71,7 @@ export async function readCatalog(
   const rows = await pool.query<
     Omit<Product, "createdAt" | "variants"> & { createdAt: Date }
   >(
-    `SELECT p.id, p.category_id AS "categoryId", p.name, p.description, p.price, p.image_url AS "imageUrl", p.is_available AS "isAvailable", p.sort_order AS "sortOrder", p.created_at AS "createdAt" FROM products p JOIN categories c ON c.id = p.category_id WHERE c.store_id = $1 ORDER BY p.sort_order, p.id`,
+    `SELECT p.id, p.category_id AS "categoryId", p.name, p.product_type AS "productType", p.description, p.add_on_groups AS "addOnGroups", p.order_questions AS "orderQuestions", p.price, p.image_url AS "imageUrl", p.is_available AS "isAvailable", p.sort_order AS "sortOrder", p.created_at AS "createdAt" FROM products p JOIN categories c ON c.id = p.category_id WHERE c.store_id = $1 ORDER BY p.sort_order, p.id`,
     [store.id],
   );
   const variants = rows.rows.length
@@ -102,6 +104,7 @@ export async function readCatalog(
 }
 export type StoreInput = {
   name: string;
+  businessCategory: CatalogStore["businessCategory"];
   description: string;
   contactPhone: string;
   address: string;
@@ -114,6 +117,8 @@ export type StoreInput = {
   logoUrl: string;
   bannerUrl: string;
   accentColor: string;
+  orderQuestions: StoreOrderQuestion[];
+  orderWorkflow: CatalogStore["orderWorkflow"];
 };
 export async function setupStore(
   input: StoreInput & {
@@ -122,10 +127,11 @@ export async function setupStore(
   ownerId: string,
 ) {
   const store = await pool.query<{ id: string }>(
-    `WITH new_store AS (INSERT INTO stores (owner_id, name, slug, description, logo_url, accent_color, contact_phone, address, operating_hours, order_types, banner_url, payment_methods, gcash_account_name, gcash_number, gcash_qr_url, is_published) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11,$12::jsonb,$13,$14,$15,false) RETURNING id), default_preference AS (INSERT INTO owner_preferences (owner_id, default_store_id) SELECT $1, id FROM new_store ON CONFLICT (owner_id) DO NOTHING RETURNING owner_id) SELECT id FROM new_store`,
+    `WITH new_store AS (INSERT INTO stores (owner_id, name, business_category, slug, description, logo_url, accent_color, contact_phone, address, operating_hours, order_types, banner_url, payment_methods, gcash_account_name, gcash_number, gcash_qr_url, order_questions, order_workflow, is_published) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13::jsonb,$14,$15,$16,$17::jsonb,$18::jsonb,false) RETURNING id), default_preference AS (INSERT INTO owner_preferences (owner_id, default_store_id) SELECT $1, id FROM new_store ON CONFLICT (owner_id) DO NOTHING RETURNING owner_id) SELECT id FROM new_store`,
     [
       ownerId,
       input.name,
+      input.businessCategory,
       input.slug,
       input.description || null,
       input.logoUrl || null,
@@ -139,6 +145,8 @@ export async function setupStore(
       input.paymentMethods.includes("GCASH") ? input.gcashAccountName : null,
       input.paymentMethods.includes("GCASH") ? input.gcashNumber : null,
       input.paymentMethods.includes("GCASH") ? input.gcashQrUrl || null : null,
+      JSON.stringify(input.orderQuestions),
+      JSON.stringify(input.orderWorkflow),
     ],
   );
   return { id: store.rows[0].id };
@@ -155,10 +163,11 @@ export async function settings(id: string, input: StoreInput, ownerId: string) {
   return transaction(async (client) => {
     await ownedStore(client, id, ownerId);
     await client.query(
-      "UPDATE stores SET name=$2, description=$3, logo_url=$4, accent_color=$5, contact_phone=$6, address=$7, operating_hours=$8::jsonb, banner_url=$9, order_types=$10::jsonb, payment_methods=$11::jsonb, gcash_account_name=$12, gcash_number=$13, gcash_qr_url=$14 WHERE id=$1",
+      "UPDATE stores SET name=$2, business_category=$3, description=$4, logo_url=$5, accent_color=$6, contact_phone=$7, address=$8, operating_hours=$9::jsonb, banner_url=$10, order_types=$11::jsonb, payment_methods=$12::jsonb, gcash_account_name=$13, gcash_number=$14, gcash_qr_url=$15, order_questions=$16::jsonb, order_workflow=$17::jsonb WHERE id=$1",
       [
         id,
         input.name,
+        input.businessCategory,
         input.description || null,
         input.logoUrl || null,
         input.accentColor,
@@ -173,6 +182,8 @@ export async function settings(id: string, input: StoreInput, ownerId: string) {
         input.paymentMethods.includes("GCASH")
           ? input.gcashQrUrl || null
           : null,
+        JSON.stringify(input.orderQuestions),
+        JSON.stringify(input.orderWorkflow),
       ],
     );
   });
@@ -204,9 +215,12 @@ export async function saveCategory(
 export type ItemInput = {
   categoryId: string;
   name: string;
+  productType: Product["productType"];
   description: string;
   price?: string;
   variants: { id?: string; label: string; price: string }[];
+  addOnGroups: ProductAddonGroup[];
+  orderQuestions: Product["orderQuestions"];
   imageUrl: string;
   isAvailable: boolean;
   sortOrder: number;
@@ -287,8 +301,8 @@ export async function importItems(
           )
         : item.price!;
       const result = await client.query<{ id: string }>(
-        `INSERT INTO products (category_id,name,description,price,image_url,is_available,sort_order)
-         VALUES ($1,$2,$3,$4,NULL,$5,$6) RETURNING id`,
+        `INSERT INTO products (category_id,name,product_type,description,price,image_url,is_available,sort_order)
+         VALUES ($1,$2,'PHYSICAL',$3,$4,NULL,$5,$6) RETURNING id`,
         [
           category.id,
           item.name,
@@ -326,6 +340,7 @@ export async function saveItem(
     const values = [
       input.categoryId,
       input.name,
+      input.productType,
       input.description || null,
       price,
       input.imageUrl || null,
@@ -334,8 +349,14 @@ export async function saveItem(
     ];
     if (itemId) {
       const result = await client.query(
-        `UPDATE products SET category_id=$1,name=$2,description=$3,price=$4,image_url=$5,is_available=$6,sort_order=$7 WHERE id=$8 AND category_id IN (SELECT id FROM categories WHERE store_id=$9) RETURNING id`,
-        [...values, itemId, id],
+        `UPDATE products SET category_id=$1,name=$2,product_type=$3,description=$4,price=$5,image_url=$6,is_available=$7,sort_order=$8,add_on_groups=$9::jsonb,order_questions=$10::jsonb WHERE id=$11 AND category_id IN (SELECT id FROM categories WHERE store_id=$12) RETURNING id`,
+        [
+          ...values,
+          JSON.stringify(input.addOnGroups),
+          JSON.stringify(input.orderQuestions),
+          itemId,
+          id,
+        ],
       );
       if (!result.rows[0]) throw new AppError(404, "Item not found");
       await saveVariants(client, itemId, input.variants, true);
@@ -344,8 +365,12 @@ export async function saveItem(
     }
     const item = (
       await client.query<{ id: string }>(
-        `INSERT INTO products (category_id,name,description,price,image_url,is_available,sort_order) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
-        values,
+        `INSERT INTO products (category_id,name,product_type,description,price,image_url,is_available,sort_order,add_on_groups,order_questions) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb) RETURNING id`,
+        [
+          ...values,
+          JSON.stringify(input.addOnGroups),
+          JSON.stringify(input.orderQuestions),
+        ],
       )
     ).rows[0];
     await saveVariants(client, item.id, input.variants, false);

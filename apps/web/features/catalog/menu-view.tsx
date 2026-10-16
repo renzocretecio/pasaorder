@@ -1,6 +1,11 @@
 "use client";
 
-import { useState, useSyncExternalStore, type CSSProperties } from "react";
+import {
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  type CSSProperties,
+} from "react";
 import Link from "next/link";
 import {
   Clock3,
@@ -18,6 +23,7 @@ import {
   type Catalog,
   type OrderType,
   type Product,
+  type SelectedProductAddon,
   type Weekday,
 } from "@pasaorder/types";
 import { Button } from "@/components/ui/button";
@@ -74,6 +80,16 @@ function formatHour(time: string) {
   return `${hour % 12 || 12}:${String(minute).padStart(2, "0")} ${hour < 12 ? "AM" : "PM"}`;
 }
 
+const businessCategoryLabels = {
+  FOOD_BEVERAGE: "Food & beverage",
+  RETAIL: "Retail",
+  BAKERY: "Bakery",
+  CLOTHING: "Clothing & accessories",
+  GIFTS_CRAFTS: "Gifts & crafts",
+  SERVICES: "Services",
+  OTHER: "Local business",
+} as const;
+
 export function MenuView({
   catalog,
   preview = false,
@@ -81,7 +97,21 @@ export function MenuView({
   catalog: Catalog;
   preview?: boolean;
 }) {
-  const { store, categories } = catalog;
+  const storefrontCatalog = useMemo(
+    () => ({
+      ...catalog,
+      store: { ...catalog.store, orderQuestions: [] },
+      categories: catalog.categories.map((category) => ({
+        ...category,
+        items: category.items.map((item) => ({
+          ...item,
+          orderQuestions: [],
+        })),
+      })),
+    }),
+    [catalog],
+  );
+  const { store, categories } = storefrontCatalog;
   const visible = categories.filter((category) => category.items.length > 0);
   const hasHours = !!store.operatingHours?.length;
   const ink = accentInk(store.accentColor);
@@ -110,10 +140,13 @@ export function MenuView({
     getServerWeekday,
   );
   const [selectedVariantId, setSelectedVariantId] = useState("");
+  const [selectedAddOns, setSelectedAddOns] = useState<SelectedProductAddon[]>(
+    [],
+  );
   const [quantity, setQuantity] = useState(1);
   const [instructions, setInstructions] = useState("");
   const { cart, setCart, cartAdjusted, saved, online, refreshing } =
-    useMenuRecovery(catalog, preview);
+    useMenuRecovery(storefrontCatalog, preview);
   const [cartOpen, setCartOpen] = useState(false);
   const [addedMessage, setAddedMessage] = useState("");
   const selectedVariant =
@@ -131,6 +164,7 @@ export function MenuView({
     setSelectedItem(item);
     setSelectedVariantId(startingVariant(item));
     setQuantity(1);
+    setSelectedAddOns([]);
     setInstructions("");
     setAddedMessage("");
   }
@@ -140,9 +174,13 @@ export function MenuView({
     const variant =
       selectedItem.variants.find((option) => option.id === selectedVariantId) ??
       null;
-    const key = [selectedItem.id, variant?.id ?? "", instructions.trim()].join(
-      ":",
-    );
+    const addOns = selectedAddOns;
+    const key = [
+      selectedItem.id,
+      variant?.id ?? "",
+      instructions.trim(),
+      ...addOns.map((choice) => `${choice.groupId}.${choice.optionId}`).sort(),
+    ].join(":");
     setCart((current) => {
       const existing = current.find((line) => line.key === key);
       if (existing)
@@ -157,6 +195,8 @@ export function MenuView({
           key,
           item: selectedItem,
           variant,
+          addOns,
+          answers: [],
           quantity,
           instructions: instructions.trim(),
         },
@@ -164,6 +204,51 @@ export function MenuView({
     });
     setAddedMessage(`${quantity} ${selectedItem.name} added to cart.`);
     setSelectedItem(null);
+  }
+
+  const addOnCents =
+    selectedItem?.addOnGroups
+      .flatMap((group) =>
+        group.options.filter((option) =>
+          selectedAddOns.some(
+            (choice) =>
+              choice.groupId === group.id && choice.optionId === option.id,
+          ),
+        ),
+      )
+      .reduce(
+        (sum, option) => sum + Math.round(Number(option.price) * 100),
+        0,
+      ) ?? 0;
+  const hasRequiredAddOns =
+    selectedItem?.addOnGroups.every(
+      (group) =>
+        !group.required ||
+        selectedAddOns.some((choice) => choice.groupId === group.id),
+    ) ?? true;
+  function toggleAddOn(
+    groupId: string,
+    optionId: string,
+    selection: "SINGLE" | "MULTIPLE",
+  ) {
+    setSelectedAddOns((current) => {
+      const exists = current.some(
+        (choice) => choice.groupId === groupId && choice.optionId === optionId,
+      );
+      if (exists)
+        return current.filter(
+          (choice) =>
+            !(choice.groupId === groupId && choice.optionId === optionId),
+        );
+      const otherGroups = current.filter(
+        (choice) => choice.groupId !== groupId,
+      );
+      const sameGroup =
+        selection === "MULTIPLE"
+          ? current.filter((choice) => choice.groupId === groupId)
+          : [];
+      return [...otherGroups, ...sameGroup, { groupId, optionId }];
+    });
   }
 
   return (
@@ -195,9 +280,9 @@ export function MenuView({
           >
             <p className="mx-auto max-w-5xl">
               {!online
-                ? "You’re offline. You can keep editing this menu’s cart. Reconnect to place your order."
+                ? "You’re offline. You can keep editing this catalog’s cart. Reconnect to place your order."
                 : refreshing
-                  ? "Connection restored. Refreshing the menu…"
+                  ? "Connection restored. Refreshing the catalog…"
                   : cartAdjusted
                     ? "Some saved items or options are no longer available and were removed. Please review your cart."
                     : saved
@@ -240,6 +325,9 @@ export function MenuView({
                     {store.name}
                   </h1>
                 </div>
+                <p className="mt-3 text-xs font-medium uppercase tracking-[0.08em] text-[#59685d]">
+                  {businessCategoryLabels[store.businessCategory]}
+                </p>
                 {store.description && (
                   <p className="mt-3 break-words whitespace-pre-wrap text-sm leading-relaxed text-[#59685d]">
                     {store.description}
@@ -309,7 +397,7 @@ export function MenuView({
       </header>
       {visible.length > 0 && (
         <nav
-          aria-label="Menu navigation"
+          aria-label="Catalog categories"
           className={`sticky ${preview ? "top-[var(--workspace-top)]" : "top-0"} z-10 border-y border-[#d6dfd6] bg-[#f6f5ef]`}
         >
           <MenuCategories
@@ -358,6 +446,13 @@ export function MenuView({
                         <span className="break-words text-base font-semibold">
                           {item.name}
                         </span>
+                        {item.productType !== "PHYSICAL" && (
+                          <span className="mt-1 text-xs font-medium text-[#59685d]">
+                            {item.productType === "MADE_TO_ORDER"
+                              ? "Made to order"
+                              : "Service"}
+                          </span>
+                        )}
                         <span className="mt-1 text-sm font-semibold tabular-nums text-[var(--store-accent-ink)]">
                           {displayPrice(item)}
                         </span>
@@ -447,10 +542,29 @@ export function MenuView({
                     <Dialog.Title className="break-words text-xl font-semibold tracking-[-0.02em]">
                       {selectedItem.name}
                     </Dialog.Title>
+                    {selectedItem.productType !== "PHYSICAL" && (
+                      <p className="mt-2 text-sm font-medium text-[#59685d]">
+                        {selectedItem.productType === "MADE_TO_ORDER"
+                          ? "Made to order"
+                          : "Service"}
+                      </p>
+                    )}
                     <Dialog.Description className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-[#59685d]">
                       {selectedItem.description || "Product details"}
                     </Dialog.Description>
                   </div>
+                  {selectedItem.productType === "MADE_TO_ORDER" && (
+                    <p className="rounded-xl bg-[var(--store-accent-soft)] px-4 py-3 text-sm leading-relaxed text-[#35473a]">
+                      Made after you order. Add personalization or design
+                      details in the special instructions below.
+                    </p>
+                  )}
+                  {selectedItem.productType === "SERVICE" && (
+                    <p className="rounded-xl bg-[var(--store-accent-soft)] px-4 py-3 text-sm leading-relaxed text-[#35473a]">
+                      Add any details about the service in the special
+                      instructions below.
+                    </p>
+                  )}
                   {selectedItem.variants.length > 0 ? (
                     <fieldset className="space-y-2">
                       <legend className="mb-2 text-sm font-medium">
@@ -483,6 +597,75 @@ export function MenuView({
                       {peso(selectedItem.price)}
                     </p>
                   )}
+                  {selectedItem.addOnGroups.map((group) => (
+                    <fieldset key={group.id} className="space-y-2">
+                      <legend className="mb-2 text-sm font-medium">
+                        {group.name}
+                        {group.required ? " · Required" : " · Optional"}
+                      </legend>
+                      {group.selection === "SINGLE" && !group.required && (
+                        <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-[#d6dfd6] px-4 py-3 text-sm">
+                          <input
+                            type="radio"
+                            name={`addon-${group.id}`}
+                            checked={
+                              !selectedAddOns.some(
+                                (choice) => choice.groupId === group.id,
+                              )
+                            }
+                            onChange={() =>
+                              setSelectedAddOns((current) =>
+                                current.filter(
+                                  (choice) => choice.groupId !== group.id,
+                                ),
+                              )
+                            }
+                            className="size-4 accent-[var(--store-accent-ink)]"
+                          />
+                          <span>No thanks</span>
+                        </label>
+                      )}
+                      {group.options.map((option) => {
+                        const checked = selectedAddOns.some(
+                          (choice) =>
+                            choice.groupId === group.id &&
+                            choice.optionId === option.id,
+                        );
+                        return (
+                          <label
+                            key={option.id}
+                            className={`flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 text-sm ${checked ? "border-[var(--store-accent-ink)] bg-[var(--store-accent-soft)]" : "border-[#d6dfd6]"}`}
+                          >
+                            <input
+                              type={
+                                group.selection === "SINGLE"
+                                  ? "radio"
+                                  : "checkbox"
+                              }
+                              name={`addon-${group.id}`}
+                              checked={checked}
+                              onChange={() =>
+                                toggleAddOn(
+                                  group.id,
+                                  option.id,
+                                  group.selection,
+                                )
+                              }
+                              className="size-4 accent-[var(--store-accent-ink)]"
+                            />
+                            <span className="min-w-0 flex-1">
+                              {option.name}
+                            </span>
+                            <span className="font-semibold tabular-nums text-[var(--store-accent-ink)]">
+                              {Number(option.price)
+                                ? `+${peso(option.price)}`
+                                : "Included"}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </fieldset>
+                  ))}
                   <div className="space-y-2">
                     <label
                       htmlFor="special-instructions"
@@ -539,13 +722,19 @@ export function MenuView({
                 <Button
                   type="button"
                   onClick={addToCart}
+                  disabled={!hasRequiredAddOns}
                   className="h-12 min-w-0 flex-1 rounded-xl text-base hover:bg-primary hover:brightness-95"
                 >
                   Add to cart ·{" "}
                   {peso(
                     String(
-                      Number(selectedVariant?.price ?? selectedItem.price) *
-                        quantity,
+                      ((Math.round(
+                        Number(selectedVariant?.price ?? selectedItem.price) *
+                          100,
+                      ) +
+                        addOnCents) *
+                        quantity) /
+                        100,
                     ),
                   )}
                 </Button>
@@ -562,6 +751,7 @@ export function MenuView({
         open={cartOpen}
         onOpenChange={setCartOpen}
         storeSlug={store.slug}
+        businessCategory={store.businessCategory}
         storeOrderTypes={store.orderTypes}
         storePaymentMethods={store.paymentMethods}
         gcashInstructions={{

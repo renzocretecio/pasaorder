@@ -31,27 +31,9 @@ export const envSchema = z
       (value) => (value === "" ? undefined : value),
       z.string().url().optional(),
     ),
-    GEMINI_API_KEY: z.string().min(1).optional(),
-    INFERENCE_URL: z.url().optional(),
-    INFERENCE_API_KEY: z.string().min(32).optional(),
-    META_APP_ID: z.string().min(1).optional(),
-    META_APP_SECRET: z.string().min(1).optional(),
-    META_WEBHOOK_VERIFY_TOKEN: z.string().min(1).optional(),
-    META_VERIFY_TOKEN: z.preprocess(
-      (value) => (value === "" ? undefined : value),
-      z.string().min(1).optional(),
-    ),
-    META_TOKEN_ENCRYPTION_KEY: z
-      .string()
-      .regex(/^[a-fA-F0-9]{64}$/)
-      .optional(),
-    META_REDIRECT_URI: z.string().url().optional(),
-    META_GRAPH_API_VERSION: z
-      .string()
-      .regex(/^v\d+\.\d+$/)
-      .default("v26.0"),
     R2_ENDPOINT: z.url().startsWith("https://").optional(),
     R2_BUCKET_NAME: z.string().min(1).optional(),
+    R2_PRIVATE_BUCKET_NAME: z.string().min(1).optional(),
     R2_ACCESS_KEY_ID: z.string().min(1).optional(),
     R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
     IMAGE_PREFIX: z

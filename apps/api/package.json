@@ -8,7 +8,6 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
-    "ai:check:gemini": "tsx src/scripts/check-gemini.ts",
     "seed:demo-orders": "tsx src/scripts/seed-demo-orders.ts",
     "test": "tsx --test tests/*.test.ts"
   },

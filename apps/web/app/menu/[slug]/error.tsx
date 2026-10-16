@@ -5,7 +5,7 @@ export default function MenuError({ reset }: { reset: () => void }) {
     <main className="grid min-h-dvh place-items-center px-6">
       <div className="max-w-sm text-center">
         <h2 className="text-[28px] font-[650] leading-tight tracking-tight">
-          We couldn’t load this menu.
+          We couldn’t load this catalog.
         </h2>
         <p className="mt-4 text-sm text-muted-foreground">
           Please check your connection and try again in a moment.

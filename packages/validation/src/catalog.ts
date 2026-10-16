@@ -12,6 +12,15 @@ const weekdays = [
 const optionalText = (max: number) => z.string().trim().max(max).default("");
 const orderTypeValues = ["DINE_IN", "PICKUP", "DELIVERY"] as const;
 const paymentMethodValues = ["CASH", "GCASH"] as const;
+const businessCategoryValues = [
+  "FOOD_BEVERAGE",
+  "RETAIL",
+  "BAKERY",
+  "CLOTHING",
+  "GIFTS_CRAFTS",
+  "SERVICES",
+  "OTHER",
+] as const;
 export const imageUrlSchema = z
   .string()
   .trim()
@@ -76,9 +85,108 @@ export const operatingHoursSchema = z
         });
     }
   });
+
+const addonOptionSchema = z
+  .object({
+    id: z.uuid(),
+    name: z.string().trim().min(1).max(80),
+    price: z.string().regex(/^(?:0|[1-9]\d{0,7})(?:\.\d{1,2})?$/),
+  })
+  .strict();
+export const productAddonGroupSchema = z
+  .object({
+    id: z.uuid(),
+    name: z.string().trim().min(1).max(80),
+    selection: z.enum(["SINGLE", "MULTIPLE"]),
+    required: z.boolean(),
+    options: z.array(addonOptionSchema).min(1).max(20),
+  })
+  .strict()
+  .superRefine((group, context) => {
+    if (
+      new Set(group.options.map((option) => option.id)).size !==
+      group.options.length
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["options"],
+        message: "Option IDs must be unique",
+      });
+    if (
+      new Set(group.options.map((option) => option.name.toLocaleLowerCase()))
+        .size !== group.options.length
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["options"],
+        message: "Option names must be unique",
+      });
+  });
+const storeOrderQuestionSchema = z
+  .object({
+    id: z.uuid(),
+    label: z.string().trim().min(2).max(100),
+    placeholder: z.string().trim().max(100).optional(),
+    type: z.enum(["TEXT", "NUMBER", "SELECT", "CHECKBOX", "DATE", "FILE"]),
+    required: z.boolean(),
+    options: z.array(z.string().trim().min(1).max(80)).max(12),
+  })
+  .strict()
+  .superRefine((question, context) => {
+    if (question.type === "SELECT" && question.options.length < 2)
+      context.addIssue({
+        code: "custom",
+        path: ["options"],
+        message: "Add at least two choices",
+      });
+    if (question.type !== "SELECT" && question.options.length)
+      context.addIssue({
+        code: "custom",
+        path: ["options"],
+        message: "Only select questions have choices",
+      });
+    if (
+      new Set(question.options.map((option) => option.toLocaleLowerCase()))
+        .size !== question.options.length
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["options"],
+        message: "Choices must be unique",
+      });
+  });
+
+export const orderWorkflowSchema = z
+  .object({
+    template: z.enum(["STANDARD", "FOOD", "RETAIL", "CUSTOM"]),
+    labels: z
+      .object({
+        NEW: z.string().trim().min(2).max(40),
+        CONFIRMED: z.string().trim().min(2).max(40),
+        PREPARING: z.string().trim().min(2).max(40),
+        READY: z.string().trim().min(2).max(40),
+        COMPLETED: z.string().trim().min(2).max(40),
+        CANCELLED: z.literal("Cancelled"),
+      })
+      .strict(),
+  })
+  .strict()
+  .superRefine((workflow, context) => {
+    const values = Object.values(workflow.labels).map((label) =>
+      label.toLocaleLowerCase(),
+    );
+    if (new Set(values).size !== values.length)
+      context.addIssue({
+        code: "custom",
+        path: ["labels"],
+        message: "Each workflow step needs a different label",
+      });
+  });
+
 export const catalogStoreSettingsSchema = z
   .object({
     name: z.string().trim().min(2).max(120),
+    businessCategory: z.enum(businessCategoryValues).default("OTHER"),
     description: optionalText(2000),
     contactPhone: optionalText(40).refine(
       (phone) =>
@@ -115,8 +223,29 @@ export const catalogStoreSettingsSchema = z
     logoUrl: imageUrlSchema,
     bannerUrl: imageUrlSchema,
     accentColor: accentColorSchema.default("#244d35"),
+    orderQuestions: z.array(storeOrderQuestionSchema).max(8).default([]),
+    orderWorkflow: orderWorkflowSchema.default({
+      template: "STANDARD",
+      labels: {
+        NEW: "New",
+        CONFIRMED: "Confirmed",
+        PREPARING: "Preparing",
+        READY: "Ready",
+        COMPLETED: "Completed",
+        CANCELLED: "Cancelled",
+      },
+    }),
   })
   .superRefine((settings, context) => {
+    if (
+      new Set(settings.orderQuestions.map((question) => question.id)).size !==
+      settings.orderQuestions.length
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["orderQuestions"],
+        message: "Order question IDs must be unique",
+      });
     if (settings.paymentMethods.includes("GCASH")) {
       if (!settings.gcashAccountName.trim())
         context.addIssue({
@@ -161,9 +290,14 @@ export const catalogItemSchema = z
   .object({
     categoryId: idSchema,
     name: z.string().trim().min(2).max(120),
+    productType: z
+      .enum(["PHYSICAL", "MADE_TO_ORDER", "SERVICE"])
+      .default("PHYSICAL"),
     description: optionalText(1000),
     price: priceSchema.optional(),
-    variants: z.array(variantSchema).max(20).default([]),
+    variants: z.array(variantSchema).max(40).default([]),
+    addOnGroups: z.array(productAddonGroupSchema).max(8).default([]),
+    orderQuestions: z.array(storeOrderQuestionSchema).max(8).default([]),
     imageUrl: imageUrlSchema,
     isAvailable: z.boolean().default(true),
     sortOrder: z.coerce.number().int().min(0).max(100000).default(0),
@@ -175,6 +309,33 @@ export const catalogItemSchema = z
         code: "custom",
         path: ["price"],
         message: "Enter a price or add at least one size or piece option",
+      });
+    if (
+      new Set(item.addOnGroups.map((group) => group.id)).size !==
+      item.addOnGroups.length
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["addOnGroups"],
+        message: "Add-on groups must be unique",
+      });
+    const optionIds = item.addOnGroups.flatMap((group) =>
+      group.options.map((option) => option.id),
+    );
+    if (new Set(optionIds).size !== optionIds.length)
+      context.addIssue({
+        code: "custom",
+        path: ["addOnGroups"],
+        message: "Add-on option IDs must be unique",
+      });
+    if (
+      new Set(item.orderQuestions.map((question) => question.id)).size !==
+      item.orderQuestions.length
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["orderQuestions"],
+        message: "Product question IDs must be unique",
       });
     const labels = new Set<string>();
     for (const [index, variant] of item.variants.entries()) {
@@ -202,7 +363,7 @@ export const catalogImportSchema = z
             name: z.string().trim().min(2).max(120),
             description: optionalText(1000),
             price: priceSchema.optional(),
-            variants: z.array(variantSchema.omit({ id: true })).max(20),
+            variants: z.array(variantSchema.omit({ id: true })).max(40),
             isAvailable: z.boolean(),
           })
           .strict()

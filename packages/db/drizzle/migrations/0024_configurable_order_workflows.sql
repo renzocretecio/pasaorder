@@ -1,0 +1,1 @@
+ALTER TABLE "stores" ADD COLUMN "order_workflow" jsonb DEFAULT '{"template":"STANDARD","labels":{"NEW":"New","CONFIRMED":"Confirmed","PREPARING":"Preparing","READY":"Ready","COMPLETED":"Completed","CANCELLED":"Cancelled"}}'::jsonb NOT NULL;

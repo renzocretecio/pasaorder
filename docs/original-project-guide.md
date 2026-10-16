@@ -1,6 +1,6 @@
 # Original planning guide (archived)
 
-This guide records the initial plan. The current implementation gives each store a direct owner and has no business entity; see the repository README and `apps/web/PRODUCT.md` for the current model.
+This is a historical planning document, not a guide to the current product or architecture. It contains proposals for features and integrations—including AI, Meta messaging, and OCI—that are not part of the current implementation. Use the root `README.md`, `PROJECT_SUMMARY.md`, `apps/web/PRODUCT.md`, and `docs/architecture.md` for current behavior. The current data model attaches each store directly to its owner and does not have a separate business entity.
 
 Absolutely. Since you’ve settled on **Next.js + Express + TypeScript + PostgreSQL** with a monorepo, I’d build PasaOrder incrementally rather than setting up every module at once.
 

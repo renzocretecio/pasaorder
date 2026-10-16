@@ -4,6 +4,9 @@ import { idSchema } from "./common.js";
 export const createProductSchema = z.object({
   categoryId: idSchema,
   name: z.string().trim().min(2).max(120),
+  productType: z
+    .enum(["PHYSICAL", "MADE_TO_ORDER", "SERVICE"])
+    .default("PHYSICAL"),
   description: z.string().trim().max(1000).optional(),
   price: z
     .string()
