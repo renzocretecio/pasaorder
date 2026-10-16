@@ -1,5 +1,71 @@
+import type { StoreOrderAnswer } from "./catalog.js";
+import type { ProductType } from "./product.js";
+
 export type OrderStatus =
   "NEW" | "CONFIRMED" | "PREPARING" | "READY" | "COMPLETED" | "CANCELLED";
+
+export const orderWorkflowStatuses = [
+  "NEW",
+  "CONFIRMED",
+  "PREPARING",
+  "READY",
+  "COMPLETED",
+  "CANCELLED",
+] as const satisfies readonly OrderStatus[];
+export type OrderWorkflowTemplate = "STANDARD" | "FOOD" | "RETAIL" | "CUSTOM";
+export type OrderWorkflow = {
+  template: OrderWorkflowTemplate;
+  labels: Record<OrderStatus, string>;
+};
+export const orderWorkflowTemplates: Record<
+  OrderWorkflowTemplate,
+  OrderWorkflow
+> = {
+  STANDARD: {
+    template: "STANDARD",
+    labels: {
+      NEW: "New",
+      CONFIRMED: "Confirmed",
+      PREPARING: "Preparing",
+      READY: "Ready",
+      COMPLETED: "Completed",
+      CANCELLED: "Cancelled",
+    },
+  },
+  FOOD: {
+    template: "FOOD",
+    labels: {
+      NEW: "New",
+      CONFIRMED: "Accepted",
+      PREPARING: "Preparing",
+      READY: "Ready for pickup",
+      COMPLETED: "Completed",
+      CANCELLED: "Cancelled",
+    },
+  },
+  RETAIL: {
+    template: "RETAIL",
+    labels: {
+      NEW: "New",
+      CONFIRMED: "Confirmed",
+      PREPARING: "Packing",
+      READY: "Shipped",
+      COMPLETED: "Completed",
+      CANCELLED: "Cancelled",
+    },
+  },
+  CUSTOM: {
+    template: "CUSTOM",
+    labels: {
+      NEW: "New",
+      CONFIRMED: "Confirmed",
+      PREPARING: "In progress",
+      READY: "Ready",
+      COMPLETED: "Completed",
+      CANCELLED: "Cancelled",
+    },
+  },
+};
 
 export const orderTypes = ["DINE_IN", "PICKUP", "DELIVERY"] as const;
 export type OrderType = (typeof orderTypes)[number];
@@ -8,85 +74,6 @@ export type PaymentMethod = (typeof paymentMethods)[number];
 export type PaymentStatus = "UNPAID" | "PAID";
 export type OrderSource =
   "MENU" | "MANUAL" | "MESSENGER" | "INSTAGRAM" | "WEB_CHAT";
-export type CustomerChatMessage = {
-  id: string;
-  text: string;
-  createdAt: string;
-};
-export type CustomerChat = {
-  customerName: string;
-  messages: CustomerChatMessage[];
-  status: "DRAFT" | "CONFIRMED";
-};
-export type ChatOrderDraftData = {
-  customerName?: string;
-  customerPhone?: string;
-  orderType?: OrderType;
-  tableNumber?: string;
-  deliveryAddress?: string;
-  paymentMethod?: PaymentMethod;
-  notes?: string;
-  items?: {
-    productId: string;
-    variantId: string | null;
-    quantity: number;
-    specialInstructions?: string;
-  }[];
-};
-export type ChatRoute =
-  | "EXTRACT_ORDER"
-  | "REVIEW_MODIFICATION"
-  | "REVIEW_CANCELLATION"
-  | "REVIEW_STATUS"
-  | "REVIEW_PRODUCT"
-  | "REVIEW_STORE"
-  | "REVIEW_PAYMENT"
-  | "REVIEW_GREETING"
-  | "REVIEW_OTHER"
-  | "REVIEW_UNCLEAR";
-export type ChatDecision = {
-  model: "thinkless";
-  policyVersion: 3;
-  provider: string;
-  bucket: "POSSIBLE_ORDER" | "NEEDS_ATTENTION" | "NORMAL";
-  confidence: number;
-  analyzedAt: string;
-};
-export type ChatExtractionReview = {
-  model: "gemini-3.5-flash-lite";
-  conversationText: string;
-  decision: ChatDecision | null;
-  needsAttention: boolean;
-  suggested: ChatOrderDraftData;
-  unmatchedItems: {
-    name: string;
-    option: string | null;
-    quantity: number;
-    reason: string;
-  }[];
-  requestedTime: string | null;
-  questions: string[];
-};
-export type ChatReviewContext = {
-  title: string;
-  facts: string[];
-};
-export type ChatOrderDraft = {
-  id: string;
-  storeId: string;
-  source: Exclude<OrderSource, "MENU" | "MANUAL">;
-  conversationText: string;
-  draftData: ChatOrderDraftData;
-  decision: ChatDecision | null;
-  status: "DRAFT" | "CONFIRMED";
-  orderId: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
-export type ChatOrderDraftSummary = Omit<ChatOrderDraft, "conversationText"> & {
-  latestMessage: string | null;
-  inboxBucket: "POSSIBLE_ORDER" | "NEEDS_ATTENTION" | "NORMAL";
-};
 export type PaymentInstructions = {
   gcashAccountName: string;
   gcashNumber: string;
@@ -98,11 +85,33 @@ export type OrderItem = {
   orderId: string;
   productId: string;
   productName: string;
+  productType: ProductType;
   optionLabel: string | null;
   specialInstructions: string | null;
+  addOns: { groupName: string; optionName: string; price: string }[];
+  productAnswers: StoreOrderAnswer[];
   quantity: number;
   unitPrice: string;
   subtotal: string;
+};
+
+export type OrderAttachment = {
+  id: string;
+  orderId: string;
+  orderItemId: string | null;
+  questionId: string;
+  questionLabel: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+};
+
+export type PaymentProof = {
+  id: string;
+  fileName: string;
+  contentType: "image/webp";
+  sizeBytes: number;
+  createdAt: string;
 };
 
 export type Order = {
@@ -123,6 +132,7 @@ export type Order = {
   deliveryFee: string | null;
   total: string;
   notes: string | null;
+  formAnswers?: StoreOrderAnswer[];
   createdAt: string;
   items?: OrderItem[];
 };
@@ -143,11 +153,14 @@ export type OwnerOrder = Pick<
   | "deliveryFee"
   | "total"
   | "notes"
+  | "formAnswers"
   | "createdAt"
 > & {
   storeName: string;
   subtotal: string;
   items: OrderItem[];
+  attachments: OrderAttachment[];
+  paymentProof: PaymentProof | null;
 };
 
 export type PastOrdersPage = {

@@ -1,9 +1,17 @@
-import type { Catalog, Product, ProductVariant } from "@pasaorder/types";
+import type {
+  Catalog,
+  Product,
+  ProductVariant,
+  SelectedProductAddon,
+  StoreOrderAnswer,
+} from "@pasaorder/types";
 
 export type CartLine = {
   key: string;
   item: Product;
   variant: ProductVariant | null;
+  addOns: SelectedProductAddon[];
+  answers: StoreOrderAnswer[];
   quantity: number;
   instructions: string;
 };
@@ -21,6 +29,8 @@ export function encodeCart(lines: CartLine[], now = Date.now()) {
       variantId: line.variant?.id ?? null,
       quantity: line.quantity,
       instructions: line.instructions,
+      addOns: line.addOns,
+      answers: line.answers,
     })),
   });
 }
@@ -66,7 +76,70 @@ export function restoreCart(
         continue;
       }
       const instructions = saved.instructions.trim();
-      const key = [item.id, variant?.id ?? "", instructions].join(":");
+      const addOns = Array.isArray(saved.addOns)
+        ? saved.addOns.filter((choice: SelectedProductAddon) =>
+            item.addOnGroups.some(
+              (group) =>
+                group.id === choice.groupId &&
+                group.options.some((option) => option.id === choice.optionId),
+            ),
+          )
+        : [];
+      const answers = Array.isArray(saved.answers)
+        ? saved.answers.flatMap((answer: StoreOrderAnswer) => {
+            const question = item.orderQuestions?.find(
+              (candidate) => candidate.id === answer?.questionId,
+            );
+            if (!question || typeof answer?.value !== "string") return [];
+            const value = answer.value;
+            const valid =
+              question.type === "SELECT"
+                ? question.options.includes(value)
+                : question.type === "CHECKBOX"
+                  ? value === "true" || value === "false"
+                  : question.type === "NUMBER"
+                    ? value.trim() !== "" && Number.isFinite(Number(value))
+                    : question.type === "DATE"
+                      ? /^\d{4}-\d{2}-\d{2}$/.test(value)
+                      : question.type === "FILE"
+                        ? false
+                        : value.length <= 1000;
+            return valid
+              ? [{ questionId: question.id, label: question.label, value }]
+              : [];
+          })
+        : [];
+      if (
+        Array.isArray(saved.answers) &&
+        answers.length !== saved.answers.length
+      )
+        changed = true;
+      const valid = new Set(
+        addOns.map((choice: SelectedProductAddon) => choice.groupId),
+      );
+      if (
+        item.addOnGroups.some((group) => group.required && !valid.has(group.id))
+      ) {
+        changed = true;
+        continue;
+      }
+      const key = [
+        item.id,
+        variant?.id ?? "",
+        instructions,
+        ...addOns
+          .map(
+            (choice: SelectedProductAddon) =>
+              `${choice.groupId}.${choice.optionId}`,
+          )
+          .sort(),
+        ...answers
+          .map(
+            (answer: StoreOrderAnswer) =>
+              `${answer.questionId}.${answer.value}`,
+          )
+          .sort(),
+      ].join(":");
       if (lines.some((line) => line.key === key)) {
         changed = true;
         continue;
@@ -75,6 +148,8 @@ export function restoreCart(
         key,
         item,
         variant,
+        addOns,
+        answers,
         quantity: saved.quantity,
         instructions,
       });

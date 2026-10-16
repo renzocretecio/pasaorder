@@ -12,9 +12,11 @@ import {
 import {
   weekdays,
   orderTypes,
+  businessCategories,
   type CatalogStore,
   type CatalogCategory,
   type OrderType,
+  type BusinessCategory,
   type Product,
   type Weekday,
   type PaymentMethod,
@@ -29,6 +31,7 @@ import { Check, ChevronDown, ArrowUpRight, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ShareMenu } from "./share-menu";
 import { ImageUpload } from "./image-upload";
+import { ProductAddonsEditor } from "./product-addons-editor";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -150,6 +153,28 @@ function Field({
 const selectStyle =
   "h-12 w-full min-w-0 rounded-xl border border-input bg-card px-3 text-base focus-visible:outline-2 focus-visible:outline-ring";
 
+const orderTypesByBusinessCategory: Record<
+  BusinessCategory,
+  readonly OrderType[]
+> = {
+  FOOD_BEVERAGE: orderTypes,
+  RETAIL: ["PICKUP", "DELIVERY"],
+  BAKERY: orderTypes,
+  CLOTHING: ["PICKUP", "DELIVERY"],
+  GIFTS_CRAFTS: ["PICKUP", "DELIVERY"],
+  SERVICES: ["PICKUP", "DELIVERY"],
+  OTHER: orderTypes,
+};
+const businessCategoryLabels: Record<BusinessCategory, string> = {
+  FOOD_BEVERAGE: "Food & beverage",
+  RETAIL: "Retail",
+  BAKERY: "Bakery",
+  CLOTHING: "Clothing & accessories",
+  GIFTS_CRAFTS: "Gifts & crafts",
+  SERVICES: "Services",
+  OTHER: "Other",
+};
+
 function slugFromName(name: string) {
   return name
     .normalize("NFKD")
@@ -242,8 +267,19 @@ export function StoreForm({ store }: { store?: CatalogStore }) {
   const [name, setName] = useState(state.values?.name ?? store?.name ?? "");
   const [slug, setSlug] = useState(state.values?.slug ?? "");
   const [slugEdited, setSlugEdited] = useState(false);
+  const initialBusinessCategory =
+    businessCategories.find(
+      (category) => category === state.values?.businessCategory,
+    ) ??
+    store?.businessCategory ??
+    "OTHER";
+  const [businessCategory, setBusinessCategory] = useState<BusinessCategory>(
+    initialBusinessCategory,
+  );
   const [selectedOrderTypes, setSelectedOrderTypes] = useState<OrderType[]>(
-    store?.orderTypes ?? [...orderTypes],
+    store?.orderTypes ?? [
+      ...orderTypesByBusinessCategory[initialBusinessCategory],
+    ],
   );
   const [selectedPaymentMethods, setSelectedPaymentMethods] = useState<
     PaymentMethod[]
@@ -279,12 +315,41 @@ export function StoreForm({ store }: { store?: CatalogStore }) {
           }}
           placeholder="The name customers will see"
         />
+        <Field
+          name="businessCategory"
+          label="Business category"
+          state={state}
+          hint="Helps customers understand what your business offers."
+        >
+          {(control) => (
+            <select
+              {...control}
+              name="businessCategory"
+              required
+              value={businessCategory}
+              onChange={(event) => {
+                const nextCategory = event.target.value as BusinessCategory;
+                setBusinessCategory(nextCategory);
+                setSelectedOrderTypes([
+                  ...orderTypesByBusinessCategory[nextCategory],
+                ]);
+              }}
+              className={selectStyle}
+            >
+              {businessCategories.map((category) => (
+                <option key={category} value={category}>
+                  {businessCategoryLabels[category]}
+                </option>
+              ))}
+            </select>
+          )}
+        </Field>
         {!store && (
           <Field
             name="slug"
-            label="Menu link"
+            label="Storefront link"
             state={state}
-            hint={`Your link: /menu/${slug || "your-store"}. Generated from the store name; you can edit it before creating the store.`}
+            hint={`Your storefront link: /menu/${slug || "your-store"}. Generated from the store name; you can edit it before creating the store.`}
             required
             maxLength={120}
             pattern="[a-z0-9]+(-[a-z0-9]+)*"
@@ -314,7 +379,7 @@ export function StoreForm({ store }: { store?: CatalogStore }) {
           name="contactPhone"
           label="Contact phone"
           state={state}
-          hint="Optional. Customers can tap this number on your menu."
+          hint="Optional. Customers can tap this number from your catalog."
           type="tel"
           maxLength={40}
           defaultValue={state.values?.contactPhone ?? store?.contactPhone ?? ""}
@@ -340,10 +405,10 @@ export function StoreForm({ store }: { store?: CatalogStore }) {
         <fieldset className="space-y-3">
           <legend className="text-[13px] font-medium">Order options</legend>
           <p className="text-[13px] text-muted-foreground">
-            Choose how customers can receive their orders.
+            Choose how customers can receive orders for this category.
           </p>
           <div className="flex flex-wrap gap-2">
-            {orderTypes.map((orderType) => {
+            {orderTypesByBusinessCategory[businessCategory].map((orderType) => {
               const selected = selectedOrderTypes.includes(orderType);
               const label =
                 orderType === "DINE_IN"
@@ -417,7 +482,7 @@ export function StoreForm({ store }: { store?: CatalogStore }) {
           name="logoUrl"
           label="Store logo"
           state={state}
-          hint="Optional. Shown on your public menu."
+          hint="Optional. Shown on your public catalog."
         >
           {(control) => (
             <ImageUpload
@@ -648,6 +713,17 @@ export function ItemForm({
   );
   const variantFieldId = useId();
   const variantErrorId = useId();
+  const savedAddons = (() => {
+    try {
+      return (
+        JSON.parse(state.values?.addOnGroups ?? "null") ??
+        item?.addOnGroups ??
+        []
+      );
+    } catch {
+      return item?.addOnGroups ?? [];
+    }
+  })();
   return (
     <form
       ref={formRef}
@@ -689,12 +765,34 @@ export function ItemForm({
           defaultValue={state.values?.name ?? item?.name}
           placeholder="What are you selling?"
         />
+        <Field
+          name="productType"
+          label="What kind of item is this?"
+          state={state}
+          hint="This helps customers know what to expect when ordering."
+        >
+          {(control) => (
+            <select
+              {...control}
+              name="productType"
+              required
+              defaultValue={
+                state.values?.productType ?? item?.productType ?? "PHYSICAL"
+              }
+              className={selectStyle}
+            >
+              <option value="PHYSICAL">Ready-made product</option>
+              <option value="MADE_TO_ORDER">Made to order</option>
+              <option value="SERVICE">Service</option>
+            </select>
+          )}
+        </Field>
         <div className="space-y-3">
           <p className="text-[13px] font-medium">How is it priced?</p>
           <div className="grid grid-cols-2 gap-2">
             {[
               { value: false, label: "One price" },
-              { value: true, label: "Sizes / pieces" },
+              { value: true, label: "Options / variants" },
             ].map((choice) => (
               <label
                 key={choice.label}
@@ -727,9 +825,10 @@ export function ItemForm({
           <div className="space-y-3">
             <div className="flex items-baseline justify-between gap-3">
               <div>
-                <p className="text-[13px] font-medium">Size or piece options</p>
+                <p className="text-[13px] font-medium">Product options</p>
                 <p className="mt-1 text-[13px] text-muted-foreground">
-                  Add a price for each choice customers can see.
+                  Enter each sellable combination and its price, such as Small /
+                  Red or 6 pcs.
                 </p>
               </div>
             </div>
@@ -762,7 +861,7 @@ export function ItemForm({
                         ),
                       )
                     }
-                    placeholder="Small / 6 pcs"
+                    placeholder="e.g. Small / Red"
                     className="h-12 min-w-0 rounded-xl text-base"
                   />
                 </div>
@@ -873,11 +972,15 @@ export function ItemForm({
             />
           )}
         </Field>
+        <ProductAddonsEditor
+          key={`product-addons:${state.values?.addOnGroups ?? item?.id ?? "new"}`}
+          initialGroups={savedAddons}
+        />
         <Field
           name="imageUrl"
           label="Product image"
           state={state}
-          hint="Optional. Shown beside this item in the menu."
+          hint="Optional. Shown beside this item in your catalog."
         >
           {(control) => (
             <ImageUpload
@@ -947,7 +1050,7 @@ export function PublishPanel({
       {!store.isPublished && (
         <p className="mt-3 text-[13px] leading-relaxed text-muted-foreground">
           {available
-            ? "Preview your items, then make your menu link live."
+            ? "Preview your items, then publish your storefront link."
             : "Add a category and an available item to get started."}
         </p>
       )}
@@ -993,7 +1096,7 @@ export function PublishPanel({
                   rel="noopener noreferrer"
                   className="my-3 inline-flex min-h-11 items-center gap-2 text-sm font-medium text-primary"
                 >
-                  Open public menu
+                  Open public catalog
                   <ArrowUpRight className="size-4" aria-hidden="true" />
                   <span className="sr-only">(opens in a new tab)</span>
                 </Link>
@@ -1035,7 +1138,7 @@ export function PublishPanel({
                   ))}
                 </ol>
                 <p className="mt-4 break-all text-[13px] leading-relaxed text-muted-foreground">
-                  Your permanent link: /menu/{store.slug}
+                  Your permanent storefront link: /menu/{store.slug}
                 </p>
                 <p className="mt-3 text-[13px] text-muted-foreground">
                   Your link and QR code become available after publishing.

@@ -64,21 +64,16 @@ async function main() {
 
     const today = startOfTodayInManila(new Date());
     const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
-    const existing = await client.query<{ orders: string; chats: string }>(
-      `SELECT (SELECT count(*) FROM orders WHERE store_id = $1 AND notes LIKE $2 AND created_at >= $3 AND created_at < $4)::text AS orders, (SELECT count(*) FROM chat_order_drafts WHERE store_id = $1 AND provider_conversation_id LIKE $5 AND created_at >= $3 AND created_at < $4)::text AS chats`,
-      [store.id, `${marker}%`, today, tomorrow, `demo:${slug}:%`],
+    const existing = await client.query<{ orders: string }>(
+      `SELECT count(*)::text AS orders FROM orders WHERE store_id = $1 AND notes LIKE $2 AND created_at >= $3 AND created_at < $4`,
+      [store.id, `${marker}%`, today, tomorrow],
     );
     const existingOrders = Number(existing.rows[0].orders);
-    const existingChats = Number(existing.rows[0].chats);
-    if ((existingOrders || existingChats) && !replaceExisting)
+    if (existingOrders && !replaceExisting)
       throw new Error(
-        `Demo data already exists today for ${slug} (${existingOrders} orders, ${existingChats} chats). Add --replace to replace only today's tagged demo records.`,
+        `Demo orders already exist today for ${slug} (${existingOrders} orders). Add --replace to replace only today's tagged demo orders.`,
       );
     if (replaceExisting) {
-      await client.query(
-        `DELETE FROM chat_order_drafts WHERE store_id = $1 AND provider_conversation_id LIKE $2 AND created_at >= $3 AND created_at < $4`,
-        [store.id, `demo:${slug}:%`, today, tomorrow],
-      );
       await client.query(
         `DELETE FROM orders WHERE store_id = $1 AND notes LIKE $2 AND created_at >= $3 AND created_at < $4`,
         [store.id, `${marker}%`, today, tomorrow],
@@ -154,89 +149,8 @@ async function main() {
       }
     }
 
-    const demoChats = [
-      {
-        customerName: "Demo Chat Customer 01",
-        bucket: "POSSIBLE_ORDER",
-        messages: [
-          "Hi! Do you have iced latte?",
-          "I'd like to order two for pickup.",
-        ],
-      },
-      {
-        customerName: "Demo Chat Customer 02",
-        bucket: "POSSIBLE_ORDER",
-        messages: [
-          "Can I get one of your best sellers?",
-          "One chicken rice bowl, please.",
-        ],
-      },
-      {
-        customerName: "Demo Chat Customer 03",
-        bucket: "NEEDS_ATTENTION",
-        messages: [
-          "I placed an order a while ago.",
-          "Can I add one more drink to it?",
-        ],
-      },
-      {
-        customerName: "Demo Chat Customer 04",
-        bucket: "NEEDS_ATTENTION",
-        messages: [
-          "I need to change my pickup time.",
-          "Can someone help me with my order?",
-        ],
-      },
-      {
-        customerName: "Demo Chat Customer 05",
-        bucket: "NORMAL",
-        messages: ["What time do you close today?"],
-      },
-      {
-        customerName: "Demo Chat Customer 06",
-        bucket: "NORMAL",
-        messages: ["Thanks, got it!"],
-      },
-    ] as const;
-    for (let index = 0; index < demoChats.length; index += 1) {
-      const chat = demoChats[index];
-      const createdAt = new Date(
-        start + (span * (index + 1)) / (demoChats.length + 1),
-      );
-      const messages = chat.messages.map((text, messageIndex) => ({
-        id: `demo-${slug}-${index + 1}-${messageIndex + 1}`,
-        text,
-        createdAt: new Date(
-          createdAt.getTime() + messageIndex * 60_000,
-        ).toISOString(),
-      }));
-      const conversationText = chat.messages
-        .map((text) => `Customer: ${text}`)
-        .join("\n");
-      await client.query(
-        `INSERT INTO chat_order_drafts (store_id, source, conversation_text, draft_data, decision, provider_conversation_id, chat_messages, created_at, updated_at) VALUES ($1, 'WEB_CHAT', $2, $3::jsonb, $4::jsonb, $5, $6::jsonb, $7, $7)`,
-        [
-          store.id,
-          conversationText,
-          JSON.stringify({ customerName: chat.customerName, demoData: true }),
-          JSON.stringify({
-            model: "thinkless",
-            policyVersion: 3,
-            provider: "demo-seed",
-            bucket: chat.bucket,
-            confidence: 0.99,
-            analyzedAt: createdAt.toISOString(),
-          }),
-          `demo:${slug}:${createdAt.toISOString()}:${index + 1}`,
-          JSON.stringify(messages),
-          createdAt,
-        ],
-      );
-    }
     await client.query("COMMIT");
-    console.log(
-      `Created 8 demo orders and 6 customer chats for ${store.name} today (Manila time). Chats include 2 possible orders, 2 needing attention, and 2 ordinary conversations.`,
-    );
+    console.log(`Created 8 demo orders for ${store.name} today (Manila time).`);
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;

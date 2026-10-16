@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { createHash, randomUUID } from "node:crypto";
 import { after, before, test } from "node:test";
 import type { Server } from "node:http";
 import jwt from "jsonwebtoken";
@@ -12,11 +11,10 @@ import {
   createManualOrderSchema,
   createProductSchema,
   catalogItemSchema,
+  orderWorkflowSchema,
   imageUrlSchema,
   idSchema,
   registerSchema,
-  createChatOrderDraftSchema,
-  confirmChatOrderDraftSchema,
 } from "@pasaorder/validation";
 
 process.env.NODE_ENV = "test";
@@ -24,27 +22,12 @@ process.env.DOTENV_CONFIG_PATH = "/dev/null";
 process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test";
 process.env.JWT_SECRET = "test-secret-only-for-tests-32-characters";
 process.env.WEB_ORIGIN = "http://localhost:3000";
-delete process.env.INFERENCE_URL;
-delete process.env.INFERENCE_API_KEY;
-delete process.env.GEMINI_API_KEY;
 const { default: app } = await import("../src/app.js");
+const { envSchema } = await import("../src/config/env.js");
 const { pool } = await import("../src/db.js");
 const { signToken } = await import("../src/middleware/auth.js");
 const { prepareImage } =
   await import("../src/modules/images/images.service.js");
-const {
-  canExtractOrderCandidate,
-  currentChatDecision,
-  chatInboxBucket,
-  intentDecisionLog,
-  routeChatDecision,
-} = await import("../src/modules/orders/decision-router.js");
-const { getChatOrderDraft, listChatOrderDrafts, savePublicChatDecision } =
-  await import("../src/modules/orders/orders.repository.js");
-const { inquiryContext } =
-  await import("../src/modules/orders/inquiry-context.js");
-const { parseGeminiResponse, reviewExtraction } =
-  await import("../src/modules/orders/gemini.service.js");
 const originalQuery = (async (sql: string, params: unknown[]) => {
   if (sql.startsWith("SELECT token_version"))
     return { rows: [{ tokenVersion: 0 }] };
@@ -79,6 +62,26 @@ test("health and unknown routes have JSON responses", async () => {
   assert.deepEqual(await missing.json(), { message: "Route not found" });
   for (const route of ["businesses", "stores"])
     assert.equal((await fetch(`${base}/${route}`)).status, 404);
+  for (const route of [
+    "meta/webhook",
+    "public/chats/test",
+    "orders/chat-drafts/test",
+  ]) {
+    assert.equal((await fetch(`${base}/${route}`)).status, 404);
+  }
+});
+test("one private R2 bucket can back public image routes and private order files", () => {
+  const parsed = envSchema.safeParse({
+    NODE_ENV: "test",
+    DATABASE_URL: "postgresql://test:test@localhost:5432/test",
+    JWT_SECRET: "test-secret-only-for-tests-32-characters",
+    WEB_ORIGIN: "http://localhost:3000",
+    R2_ENDPOINT: "https://account-id.r2.cloudflarestorage.com",
+    R2_BUCKET_NAME: "pasaorder-files",
+    R2_ACCESS_KEY_ID: "test-access-key",
+    R2_SECRET_ACCESS_KEY: "test-secret-key",
+  });
+  assert.equal(parsed.success, true);
 });
 test("public store listing exposes only published menu slugs", async () => {
   const previousQuery = pool.query;
@@ -113,466 +116,6 @@ test("management routes and current user reject unauthenticated callers", async 
       ).status,
       401,
     );
-  }
-});
-test("chat order draft routes require an authenticated owner", async () => {
-  const routes: [string, string][] = [
-    ["GET", "/orders/stores/1/chat-drafts"],
-    ["POST", "/orders/stores/1/chat-drafts"],
-    ["GET", "/orders/chat-drafts/1"],
-    ["PATCH", "/orders/chat-drafts/1"],
-    ["DELETE", "/orders/chat-drafts/1"],
-    ["POST", "/orders/chat-drafts/1/prepare"],
-    ["POST", "/orders/chat-drafts/1/confirm"],
-  ];
-  for (const [method, route] of routes) {
-    const response = await fetch(`${base}${route}`, {
-      method,
-      headers: { "content-type": "application/json" },
-      body: ["POST", "PATCH"].includes(method) ? "{}" : undefined,
-    });
-    assert.equal(response.status, 401, `${method} ${route}`);
-  }
-});
-test("Gemini order extraction matches only exact available catalog items", () => {
-  const extracted = parseGeminiResponse({
-    steps: [
-      {
-        type: "model_output",
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({
-              customerName: null,
-              customerPhone: null,
-              orderType: "PICKUP",
-              tableNumber: null,
-              deliveryAddress: null,
-              paymentMethod: "UNSPECIFIED",
-              requestedTime: "7:00 PM",
-              notes: null,
-              items: [
-                {
-                  name: "Cheeseburger",
-                  option: null,
-                  quantity: 2,
-                  confirmed: true,
-                  specialInstructions: null,
-                },
-                {
-                  name: "Fries",
-                  option: "XL",
-                  quantity: 1,
-                  confirmed: true,
-                  specialInstructions: null,
-                },
-                {
-                  name: "Coke",
-                  option: null,
-                  quantity: 1,
-                  confirmed: false,
-                  specialInstructions: null,
-                },
-                {
-                  name: "Chicken Burger",
-                  option: null,
-                  quantity: 1,
-                  confirmed: true,
-                  specialInstructions: null,
-                },
-              ],
-            }),
-          },
-        ],
-      },
-    ],
-  });
-  const catalog = {
-    store: { orderTypes: ["PICKUP"], paymentMethods: ["CASH"] },
-    categories: [
-      {
-        items: [
-          { id: "11", name: "Cheeseburger", isAvailable: true, variants: [] },
-          {
-            id: "12",
-            name: "Fries",
-            isAvailable: true,
-            variants: [
-              { id: "21", label: "Small" },
-              { id: "22", label: "Large" },
-            ],
-          },
-          { id: "13", name: "Coke", isAvailable: true, variants: [] },
-          {
-            id: "14",
-            name: "Chicken Burger",
-            isAvailable: false,
-            variants: [],
-          },
-        ],
-      },
-    ],
-  } as unknown as Catalog;
-  const review = reviewExtraction(
-    extracted,
-    catalog,
-    { customerName: "Alex" },
-    "Customer: order please",
-    null,
-  );
-  assert.equal(review.suggested.customerName, "Alex");
-  assert.deepEqual(
-    review.suggested.items?.map((item) => [item.productId, item.quantity]),
-    [["11", 2]],
-  );
-  assert.equal(review.unmatchedItems[0].name, "Fries");
-  assert.equal(review.unmatchedItems[1].name, "Coke");
-  assert.match(review.unmatchedItems[1].reason, /Not clearly ordered/);
-  assert.equal(review.unmatchedItems[2].name, "Chicken Burger");
-  assert.equal(review.needsAttention, true);
-  assert.equal(review.suggested.notes, "Requested time: 7:00 PM");
-  assert.ok(
-    review.questions.some((question) => question.includes("payment method")),
-  );
-  assert.ok(
-    review.questions.every((question) => !question.includes("mobile number")),
-  );
-  assert.throws(() =>
-    parseGeminiResponse({
-      steps: [
-        {
-          type: "model_output",
-          content: [{ type: "text", text: '{"items":[]}' }],
-        },
-      ],
-    }),
-  );
-});
-test("ThinkLess buckets select review lanes without changing an order", () => {
-  const base = {
-    model: "thinkless" as const,
-    policyVersion: 3 as const,
-    provider: "rules",
-    confidence: 1,
-    analyzedAt: new Date().toISOString(),
-  };
-  const order = { ...base, bucket: "POSSIBLE_ORDER" as const };
-  const attention = { ...base, bucket: "NEEDS_ATTENTION" as const };
-  const normal = { ...base, bucket: "NORMAL" as const };
-  assert.equal(routeChatDecision(order), "EXTRACT_ORDER");
-  assert.equal(routeChatDecision(attention), "REVIEW_UNCLEAR");
-  assert.equal(routeChatDecision(normal), "REVIEW_OTHER");
-  assert.equal(routeChatDecision(normal, true), "EXTRACT_ORDER");
-  assert.equal(routeChatDecision(null), "EXTRACT_ORDER");
-  assert.equal(canExtractOrderCandidate(order), true);
-  assert.equal(canExtractOrderCandidate(attention), false);
-  assert.equal(chatInboxBucket(order), "POSSIBLE_ORDER");
-  assert.equal(chatInboxBucket(attention), "NEEDS_ATTENTION");
-  assert.equal(chatInboxBucket(normal), "NORMAL");
-  assert.equal(chatInboxBucket(null), "NEEDS_ATTENTION");
-  assert.deepEqual(intentDecisionLog("42", order), {
-    event: "chat_intent_routed",
-    draftId: "42",
-    model: "thinkless",
-    provider: "rules",
-    bucket: "POSSIBLE_ORDER",
-    confidence: 1,
-    threshold: 0.8,
-    route: "EXTRACT_ORDER",
-  });
-  assert.deepEqual(currentChatDecision(order), order);
-  assert.equal(currentChatDecision({ ...order, policyVersion: 2 }), null);
-  assert.equal(
-    currentChatDecision({ ...order, policyVersion: undefined }),
-    null,
-  );
-  assert.equal(currentChatDecision({ model: "clef-flash", intent: {} }), null);
-  assert.equal(currentChatDecision({ ...order, bucket: "UNKNOWN" }), null);
-});
-test("inquiry context uses configured catalog facts without guessing products", () => {
-  const catalog = {
-    store: {
-      address: "12 Market St",
-      contactPhone: "09171234567",
-      operatingHours: null,
-      orderTypes: ["PICKUP", "DELIVERY"],
-      paymentMethods: ["CASH", "GCASH"],
-      gcashAccountName: "Store Owner",
-      gcashNumber: "09179990000",
-    },
-    categories: [
-      {
-        items: [
-          {
-            name: "Cheeseburger",
-            price: "149.00",
-            isAvailable: true,
-            variants: [],
-          },
-          {
-            name: "Fries",
-            price: "80.00",
-            isAvailable: false,
-            variants: [],
-          },
-        ],
-      },
-    ],
-  } as unknown as Catalog;
-  const product = inquiryContext(
-    "REVIEW_PRODUCT",
-    catalog,
-    "Customer: Magkano ang cheeseburger?",
-  );
-  assert.deepEqual(product?.facts, ["Cheeseburger — Available · ₱149.00"]);
-  assert.match(
-    inquiryContext("REVIEW_PRODUCT", catalog, "Customer: May burger?")!
-      .facts[0],
-    /No exact product name/,
-  );
-  assert.ok(
-    inquiryContext("REVIEW_STORE", catalog, "Customer: Saan kayo?")!.facts.some(
-      (fact) => fact.includes("12 Market St"),
-    ),
-  );
-  assert.ok(
-    inquiryContext("REVIEW_PAYMENT", catalog, "Customer: GCash?")!.facts.some(
-      (fact) => fact.includes("09179990000"),
-    ),
-  );
-  assert.equal(inquiryContext("REVIEW_CANCELLATION", catalog, "Cancel"), null);
-});
-test("stale classification cannot replace the current conversation decision", async () => {
-  const previousQuery = pool.query;
-  const decision = {
-    model: "thinkless" as const,
-    policyVersion: 3 as const,
-    provider: "rules",
-    bucket: "POSSIBLE_ORDER" as const,
-    confidence: 1,
-    analyzedAt: new Date().toISOString(),
-  };
-  pool.query = (async (sql: string, params: unknown[]) => {
-    assert.equal(params[0], "42");
-    assert.match(sql, /conversation_text = \$2/);
-    assert.equal(params[1], "Customer: Hello");
-    return { rows: [] }; // The transcript changed while classification was running.
-  }) as typeof pool.query;
-  try {
-    assert.equal(
-      await savePublicChatDecision("42", "Customer: Hello", decision),
-      false,
-    );
-  } finally {
-    pool.query = previousQuery;
-  }
-});
-test("the inbox groups chats by their latest decision", async () => {
-  const previousQuery = pool.query;
-  const decision = {
-    model: "thinkless" as const,
-    policyVersion: 3 as const,
-    provider: "rules",
-    bucket: "POSSIBLE_ORDER" as const,
-    confidence: 1,
-    analyzedAt: new Date().toISOString(),
-  };
-  pool.query = (async (sql: string, params: unknown[]) => {
-    assert.match(sql, /chat_messages->-1->>'text'/);
-    assert.doesNotMatch(sql, /initial_decision/);
-    assert.deepEqual(params, ["7", "9"]);
-    const row = {
-      storeId: "9",
-      source: "WEB_CHAT",
-      draftData: {},
-      latestMessage: "Pa-order po",
-      status: "DRAFT",
-      orderId: null,
-      createdAt: new Date("2026-01-01"),
-      updatedAt: new Date("2026-01-02"),
-    };
-    return {
-      rows: [
-        { ...row, id: "1", decision },
-        {
-          ...row,
-          id: "2",
-          latestMessage: "Cancel ko na",
-          decision: {
-            ...decision,
-            bucket: "NEEDS_ATTENTION",
-          },
-        },
-        {
-          ...row,
-          id: "3",
-          latestMessage: "Earlier conversation",
-          decision: { model: "clef-flash", intent: { value: "CREATE_ORDER" } },
-        },
-      ],
-    };
-  }) as typeof pool.query;
-  try {
-    const drafts = await listChatOrderDrafts("7", "9");
-    assert.deepEqual(
-      drafts.map(({ inboxBucket, latestMessage }) => [
-        inboxBucket,
-        latestMessage,
-      ]),
-      [
-        ["POSSIBLE_ORDER", "Pa-order po"],
-        ["NEEDS_ATTENTION", "Cancel ko na"],
-        ["NEEDS_ATTENTION", "Earlier conversation"],
-      ],
-    );
-    assert.equal(drafts[2].decision, null);
-  } finally {
-    pool.query = previousQuery;
-  }
-});
-test("opening a draft ignores an older stored decision and keeps the conversation", async () => {
-  const previousQuery = pool.query;
-  pool.query = (async () => ({
-    rows: [
-      {
-        id: "42",
-        storeId: "9",
-        source: "WEB_CHAT",
-        conversationText: "Customer: Pa-order dalawang burger",
-        draftData: {},
-        decision: { model: "clef-flash", intent: { value: "CREATE_ORDER" } },
-        status: "DRAFT",
-        orderId: null,
-        createdAt: new Date("2026-01-01"),
-        updatedAt: new Date("2026-01-02"),
-      },
-    ],
-  })) as unknown as typeof pool.query;
-  try {
-    const draft = await getChatOrderDraft("7", "42");
-    assert.equal(draft.decision, null);
-    assert.equal(draft.conversationText, "Customer: Pa-order dalawang burger");
-  } finally {
-    pool.query = previousQuery;
-  }
-});
-test("chat drafts validate pasted text and require reviewable order items", () => {
-  assert.equal(
-    createChatOrderDraftSchema.safeParse({
-      source: "MESSENGER",
-      conversationText: "Customer: I would like to order",
-    }).success,
-    true,
-  );
-  assert.equal(
-    createChatOrderDraftSchema.safeParse({
-      source: "WHATSAPP",
-      conversationText: "Hello, I want to place an order",
-    }).success,
-    false,
-  );
-  assert.equal(
-    confirmChatOrderDraftSchema.safeParse({
-      customerName: "Alex Customer",
-      customerPhone: "09171234567",
-      orderType: "PICKUP",
-      paymentMethod: "CASH",
-      items: [],
-    }).success,
-    false,
-  );
-  assert.equal(
-    confirmChatOrderDraftSchema.safeParse({
-      customerName: "Alex Customer",
-      orderType: "PICKUP",
-      paymentMethod: "CASH",
-      items: [{ productId: "1", variantId: null, quantity: 1 }],
-    }).success,
-    true,
-  );
-});
-test("public customer chat starts with a private token and saves messages", async () => {
-  const previousQuery = pool.query;
-  let storedHash = "";
-  let storedName = "";
-  let storedMessages: { id: string; text: string; createdAt: string }[] = [];
-  pool.query = (async (sql: string, params: unknown[]) => {
-    if (sql.startsWith("INSERT INTO chat_order_drafts")) {
-      storedName = (JSON.parse(params[1] as string) as { customerName: string })
-        .customerName;
-      storedHash = params[2] as string;
-      return { rows: [{ id: "42" }] };
-    }
-    if (sql.startsWith("UPDATE chat_order_drafts d SET chat_messages")) {
-      assert.equal(params[0], storedHash);
-      storedMessages = [
-        ...storedMessages,
-        {
-          id: params[1] as string,
-          text: params[2] as string,
-          createdAt: params[3] as string,
-        },
-      ];
-      return {
-        rows: [
-          {
-            id: "42",
-            chatMessages: storedMessages,
-            conversationText: `Customer: ${storedMessages.map((message) => message.text).join("\nCustomer: ")}`,
-          },
-        ],
-      };
-    }
-    if (sql.startsWith("SELECT draft_data AS")) {
-      assert.equal(params[0], storedHash);
-      return {
-        rows: [
-          {
-            draftData: { customerName: storedName },
-            chatMessages: storedMessages,
-            status: "DRAFT",
-          },
-        ],
-      };
-    }
-    throw new Error(`Unexpected database query: ${sql}`);
-  }) as typeof pool.query;
-  try {
-    const invalid = await fetch(`${base}/public/chats/stores/coffee-shop`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ customerName: "A" }),
-    });
-    assert.equal(invalid.status, 400);
-    const started = await fetch(`${base}/public/chats/stores/coffee-shop`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ customerName: "Alex Customer" }),
-    });
-    assert.equal(started.status, 201);
-    const { token, chat } = (await started.json()) as {
-      token: string;
-      chat: { customerName: string };
-    };
-    assert.equal(chat.customerName, "Alex Customer");
-    assert.equal(storedHash, createHash("sha256").update(token).digest("hex"));
-    assert.equal((await fetch(`${base}/public/chats/invalid`)).status, 400);
-    const messageId = randomUUID();
-    const sent = await fetch(`${base}/public/chats/${token}/messages`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ messageId, text: "Two iced coffees, please" }),
-    });
-    assert.equal(sent.status, 200);
-    assert.equal(
-      (await sent.json()).messages[0].text,
-      "Two iced coffees, please",
-    );
-    const resumed = await fetch(`${base}/public/chats/${token}`);
-    assert.equal(resumed.status, 200);
-    assert.equal((await resumed.json()).chat.messages[0].id, messageId);
-  } finally {
-    pool.query = previousQuery;
   }
 });
 test("tokens for another audience or signed with another key are rejected", async () => {
@@ -953,6 +496,160 @@ test("catalog items accept one price or distinct priced options", () => {
     catalogItemSchema.safeParse({
       ...item,
       variants: [{ label: "6 pcs", price: "0" }],
+    }).success,
+    false,
+  );
+});
+test("catalog items and checkout support priced extras and custom answers", () => {
+  const item = {
+    categoryId: "1",
+    name: "Gift box",
+    price: "100.00",
+    addOnGroups: [
+      {
+        id: "123e4567-e89b-42d3-a456-426614174001",
+        name: "Wrapping",
+        selection: "SINGLE",
+        required: true,
+        options: [
+          {
+            id: "123e4567-e89b-42d3-a456-426614174002",
+            name: "Premium paper",
+            price: "15.00",
+          },
+        ],
+      },
+    ],
+  };
+  assert.equal(catalogItemSchema.safeParse(item).success, true);
+  const baseOrder = {
+    storeSlug: "gift-shop",
+    idempotencyKey: "123e4567-e89b-12d3-a456-426614174000",
+    customerName: "Customer",
+    orderType: "PICKUP",
+    paymentMethod: "CASH",
+    formAnswers: [
+      { questionId: "123e4567-e89b-42d3-a456-426614174003", value: "Tomorrow" },
+    ],
+    items: [
+      {
+        productId: "1",
+        variantId: null,
+        quantity: 1,
+        addOns: [
+          {
+            groupId: item.addOnGroups[0].id,
+            optionId: item.addOnGroups[0].options[0].id,
+          },
+        ],
+      },
+    ],
+  };
+  assert.equal(createOrderSchema.safeParse(baseOrder).success, true);
+  assert.equal(
+    createOrderSchema.safeParse({
+      ...baseOrder,
+      items: [
+        {
+          ...baseOrder.items[0],
+          addOns: [{ groupId: "bad", optionId: "bad" }],
+        },
+      ],
+    }).success,
+    false,
+  );
+});
+test("product order forms accept numeric and checkbox questions and answers", () => {
+  const numericQuestionId = "123e4567-e89b-42d3-a456-426614174010";
+  const checkboxQuestionId = "123e4567-e89b-42d3-a456-426614174011";
+  const fileQuestionId = "123e4567-e89b-42d3-a456-426614174012";
+  const product = {
+    categoryId: "1",
+    name: "Custom cake",
+    price: "500",
+    orderQuestions: [
+      {
+        id: numericQuestionId,
+        label: "How many servings?",
+        placeholder: "For example, 8",
+        type: "NUMBER",
+        required: true,
+        options: [],
+      },
+      {
+        id: checkboxQuestionId,
+        label: "Add a greeting card",
+        type: "CHECKBOX",
+        required: false,
+        options: [],
+      },
+      {
+        id: fileQuestionId,
+        label: "Reference artwork",
+        type: "FILE",
+        required: true,
+        options: [],
+      },
+    ],
+  };
+  const parsedProduct = catalogItemSchema.parse(product);
+  assert.equal(parsedProduct.orderQuestions[0].placeholder, "For example, 8");
+  assert.equal(parsedProduct.orderQuestions[1].placeholder, undefined);
+  assert.equal(
+    catalogItemSchema.safeParse({
+      ...product,
+      orderQuestions: [
+        { ...product.orderQuestions[1], options: ["Yes", "No"] },
+      ],
+    }).success,
+    false,
+  );
+  assert.equal(
+    createOrderSchema.safeParse({
+      storeSlug: "cake-shop",
+      idempotencyKey: "123e4567-e89b-12d3-a456-426614174000",
+      customerName: "Customer",
+      orderType: "PICKUP",
+      paymentMethod: "CASH",
+      items: [
+        {
+          productId: "1",
+          variantId: null,
+          quantity: 1,
+          productAnswers: [
+            { questionId: numericQuestionId, value: "12" },
+            { questionId: checkboxQuestionId, value: "true" },
+          ],
+        },
+      ],
+    }).success,
+    true,
+  );
+});
+test("order workflows keep terminal cancellation fixed and require distinct stage labels", () => {
+  const workflow = {
+    template: "RETAIL",
+    labels: {
+      NEW: "New",
+      CONFIRMED: "Confirmed",
+      PREPARING: "Packing",
+      READY: "Shipped",
+      COMPLETED: "Fulfilled",
+      CANCELLED: "Cancelled",
+    },
+  };
+  assert.equal(orderWorkflowSchema.safeParse(workflow).success, true);
+  assert.equal(
+    orderWorkflowSchema.safeParse({
+      ...workflow,
+      labels: { ...workflow.labels, READY: "Packing" },
+    }).success,
+    false,
+  );
+  assert.equal(
+    orderWorkflowSchema.safeParse({
+      ...workflow,
+      labels: { ...workflow.labels, CANCELLED: "Stopped" },
     }).success,
     false,
   );

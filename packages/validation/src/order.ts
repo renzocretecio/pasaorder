@@ -1,102 +1,6 @@
 import { z } from "zod";
 import { idSchema } from "./common.js";
 
-export const startCustomerChatSchema = z
-  .object({
-    customerName: z.string().trim().min(2).max(120),
-  })
-  .strict();
-export const sendCustomerChatMessageSchema = z
-  .object({
-    messageId: z.uuid(),
-    text: z.string().trim().min(1).max(1000),
-  })
-  .strict();
-export const customerChatTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
-
-const draftDataSchema = z
-  .object({
-    customerName: z.string().trim().max(120).optional(),
-    customerPhone: z.string().trim().max(40).optional(),
-    orderType: z.enum(["DINE_IN", "PICKUP", "DELIVERY"]).optional(),
-    tableNumber: z.string().trim().max(40).optional(),
-    deliveryAddress: z.string().trim().max(500).optional(),
-    paymentMethod: z.enum(["CASH", "GCASH"]).optional(),
-    notes: z.string().trim().max(500).optional(),
-    items: z
-      .array(
-        z.object({
-          productId: idSchema,
-          variantId: idSchema.nullable(),
-          quantity: z.number().int().positive().max(100),
-          specialInstructions: z.string().trim().max(500).optional(),
-        }),
-      )
-      .max(100)
-      .optional(),
-  })
-  .strict();
-
-export const createChatOrderDraftSchema = z
-  .object({
-    source: z.enum(["MESSENGER", "INSTAGRAM"]),
-    conversationText: z.string().trim().min(5).max(15000),
-  })
-  .strict();
-
-export const updateChatOrderDraftSchema = z
-  .object({
-    conversationText: z.string().trim().min(5).max(15000),
-    draftData: draftDataSchema,
-  })
-  .strict();
-
-export const confirmChatOrderDraftSchema = z
-  .object({
-    expectedConversationText: z.string().max(15000).optional(),
-    customerName: z.string().trim().min(2).max(120),
-    customerPhone: z
-      .string()
-      .trim()
-      .min(6)
-      .max(40)
-      .regex(/^[+()\d\s.-]+$/)
-      .optional(),
-    orderType: z.enum(["DINE_IN", "PICKUP", "DELIVERY"]),
-    tableNumber: z.string().trim().max(40).optional(),
-    deliveryAddress: z.string().trim().max(500).optional(),
-    paymentMethod: z.enum(["CASH", "GCASH"]),
-    notes: z.string().trim().max(500).optional(),
-    items: z
-      .array(
-        z.object({
-          productId: idSchema,
-          variantId: idSchema.nullable(),
-          quantity: z.number().int().positive().max(100),
-          specialInstructions: z.string().trim().max(500).optional(),
-        }),
-      )
-      .min(1)
-      .max(100),
-  })
-  .strict()
-  .superRefine((draft, context) => {
-    if (draft.orderType === "DELIVERY" && !draft.deliveryAddress?.trim()) {
-      context.addIssue({
-        code: "custom",
-        path: ["deliveryAddress"],
-        message: "Enter a delivery address",
-      });
-    }
-    if (draft.orderType !== "DINE_IN" && draft.tableNumber?.trim()) {
-      context.addIssue({
-        code: "custom",
-        path: ["tableNumber"],
-        message: "A table number is only available for dine-in orders",
-      });
-    }
-  });
-
 const createOrderBaseSchema = z
   .object({
     storeSlug: z
@@ -119,6 +23,14 @@ const createOrderBaseSchema = z
     tableNumber: z.string().trim().max(40).optional(),
     deliveryAddress: z.string().trim().max(500).optional(),
     notes: z.string().trim().max(500).optional(),
+    formAnswers: z
+      .array(
+        z
+          .object({ questionId: z.uuid(), value: z.string().trim().max(1000) })
+          .strict(),
+      )
+      .max(8)
+      .optional(),
     items: z
       .array(
         z.object({
@@ -126,6 +38,21 @@ const createOrderBaseSchema = z
           variantId: idSchema.nullable(),
           quantity: z.number().int().positive().max(100),
           specialInstructions: z.string().trim().max(500).optional(),
+          addOns: z
+            .array(z.object({ groupId: z.uuid(), optionId: z.uuid() }).strict())
+            .max(40)
+            .optional(),
+          productAnswers: z
+            .array(
+              z
+                .object({
+                  questionId: z.uuid(),
+                  value: z.string().trim().max(1000),
+                })
+                .strict(),
+            )
+            .max(8)
+            .optional(),
           expectedUnitPrice: z
             .string()
             .regex(/^(?:0|[1-9]\d{0,7})(?:\.\d{1,2})?$/)

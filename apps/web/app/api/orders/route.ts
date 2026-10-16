@@ -24,10 +24,16 @@ export async function POST(request: Request) {
         { status: 403 },
       );
   }
+  const contentType = request.headers.get("content-type") ?? "";
+  if (contentType.toLowerCase().startsWith("multipart/form-data;"))
+    return Response.json(
+      { message: "File uploads are not available at checkout" },
+      { status: 400 },
+    );
   try {
     const response = await fetch(`${apiBase()}/public/orders`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": contentType || "application/json" },
       body: await request.text(),
       signal: AbortSignal.timeout(15000),
     });

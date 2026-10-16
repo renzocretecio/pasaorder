@@ -8,6 +8,7 @@ import { Check, ChevronDown, LoaderCircle, RefreshCw, X } from "lucide-react";
 import type {
   OrderStatus,
   OrderType,
+  OrderWorkflow,
   OwnerOrder,
   PastOrdersPage,
 } from "@pasaorder/types";
@@ -33,14 +34,7 @@ const queues: { id: Queue; label: string }[] = [
   { id: "HISTORY", label: "Past orders" },
 ];
 
-const nextQueueAction: Partial<Record<Queue, string>> = {
-  NEW: "Next to review",
-  CONFIRMED: "Next to prepare",
-  PREPARING: "Next to mark ready",
-  READY: "Next to complete",
-};
-
-const statusLabel: Record<OrderStatus, string> = {
+const defaultStatusLabel: Record<OrderStatus, string> = {
   NEW: "New",
   CONFIRMED: "Confirmed",
   PREPARING: "Preparing",
@@ -72,15 +66,32 @@ const sourceLabel: Record<OwnerOrder["source"], string> = {
   WEB_CHAT: "Web chat",
 };
 
-function nextAction(status: OrderStatus) {
+function nextQueueAction(queue: Queue, labels: OrderWorkflow["labels"]) {
+  if (queue === "NEW") return `Next: ${labels.CONFIRMED.toLowerCase()}`;
+  if (queue === "CONFIRMED") return `Next: ${labels.PREPARING.toLowerCase()}`;
+  if (queue === "PREPARING") return `Next: ${labels.READY.toLowerCase()}`;
+  if (queue === "READY") return `Next: ${labels.COMPLETED.toLowerCase()}`;
+  return undefined;
+}
+
+function nextAction(status: OrderStatus, labels: OrderWorkflow["labels"]) {
   if (status === "NEW")
     return { status: "CONFIRMED" as const, label: "Confirm order" };
   if (status === "CONFIRMED")
-    return { status: "PREPARING" as const, label: "Start preparing" };
+    return {
+      status: "PREPARING" as const,
+      label: `Start ${labels.PREPARING.toLowerCase()}`,
+    };
   if (status === "PREPARING")
-    return { status: "READY" as const, label: "Mark ready" };
+    return {
+      status: "READY" as const,
+      label: `Mark ${labels.READY.toLowerCase()}`,
+    };
   if (status === "READY")
-    return { status: "COMPLETED" as const, label: "Complete order" };
+    return {
+      status: "COMPLETED" as const,
+      label: `Mark ${labels.COMPLETED.toLowerCase()}`,
+    };
   return null;
 }
 
@@ -99,13 +110,73 @@ function cents(value: number) {
   return Math.round(value * 100);
 }
 
+function PaymentProofDialog({
+  orderId,
+  uploadedAt,
+}: {
+  orderId: string;
+  uploadedAt: string;
+}) {
+  const imageUrl = `/api/orders/${encodeURIComponent(orderId)}/payment-proof`;
+  return (
+    <Dialog.Root>
+      <Dialog.Trigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          className="min-h-11 w-full rounded-lg"
+        >
+          View payment proof
+        </Button>
+      </Dialog.Trigger>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/55 backdrop-blur-[2px]" />
+        <Dialog.Content className="fixed inset-x-0 bottom-0 z-50 flex max-h-[calc(100dvh-1rem)] flex-col overflow-hidden rounded-t-2xl border bg-card shadow-xl sm:inset-x-6 sm:top-1/2 sm:bottom-auto sm:mx-auto sm:max-h-[min(52rem,calc(100dvh-2rem))] sm:max-w-4xl sm:-translate-y-1/2 sm:rounded-2xl">
+          <div className="flex shrink-0 items-start justify-between gap-4 border-b px-5 py-4 sm:px-6">
+            <div className="min-w-0">
+              <Dialog.Title className="text-lg font-semibold tracking-[-0.02em]">
+                Payment proof · Order #{orderId}
+              </Dialog.Title>
+              <Dialog.Description className="mt-1 text-sm text-muted-foreground">
+                Submitted {formatPlacedAt(uploadedAt)}. Review the transfer and
+                mark the order paid when you have verified it.
+              </Dialog.Description>
+            </div>
+            <Dialog.Close asChild>
+              <button
+                type="button"
+                aria-label="Close payment proof"
+                className="grid size-11 shrink-0 place-items-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+              >
+                <X className="size-5" aria-hidden="true" />
+              </button>
+            </Dialog.Close>
+          </div>
+          <div className="min-h-0 flex-1 overflow-auto bg-muted/40 p-3 sm:p-5">
+            <div className="grid min-h-64 place-items-center overflow-hidden rounded-xl border bg-background p-2 sm:min-h-96 sm:p-4">
+              {/* eslint-disable-next-line @next/next/no-img-element -- Authenticated same-origin route streams the private proof image. */}
+              <img
+                src={imageUrl}
+                alt={`GCash payment proof submitted for order ${orderId}`}
+                className="max-h-[65dvh] max-w-full rounded-md object-contain"
+              />
+            </div>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
 function OrderRow({
   order,
+  workflow,
   nextActionLabel,
   initialOpen,
   onSuccess,
 }: {
   order: OwnerOrder;
+  workflow: OrderWorkflow;
   nextActionLabel?: string;
   initialOpen?: boolean;
   onSuccess: (message: string) => void;
@@ -121,7 +192,8 @@ function OrderRow({
   const [paymentPending, startPaymentTransition] = useTransition();
   const [paymentMessage, setPaymentMessage] = useState("");
   const router = useRouter();
-  const action = nextAction(order.status);
+  const labels = workflow.labels ?? defaultStatusLabel;
+  const action = nextAction(order.status, labels);
   const deliveryPaymentWaitingForFee =
     order.paymentStatus === "UNPAID" &&
     order.orderType === "DELIVERY" &&
@@ -147,7 +219,7 @@ function OrderRow({
       if (result.success) {
         setDialogOpen(false);
         onSuccess(
-          `Order #${order.id} ${status === "CANCELLED" ? "cancelled" : status === "CONFIRMED" ? "confirmed" : `moved to ${statusLabel[status].toLowerCase()}`}.`,
+          `Order #${order.id} ${status === "CANCELLED" ? "cancelled" : `moved to ${labels[status].toLowerCase()}`}.`,
         );
         router.refresh();
       } else {
@@ -198,6 +270,8 @@ function OrderRow({
                 {order.items.length === 1 ? "item" : "items"}
                 {order.status !== "NEW" &&
                 (order.notes ||
+                  order.formAnswers?.length ||
+                  order.attachments.length ||
                   order.items.some((item) => item.specialInstructions))
                   ? " and notes"
                   : ""}
@@ -222,6 +296,47 @@ function OrderRow({
                   </span>{" "}
                   {item.productName}
                   {item.optionLabel ? ` · ${item.optionLabel}` : ""}
+                  {item.productType !== "PHYSICAL" && (
+                    <span className="ml-2 inline-flex rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-primary">
+                      {item.productType === "MADE_TO_ORDER"
+                        ? "Made to order"
+                        : "Service"}
+                    </span>
+                  )}
+                  {item.addOns.length > 0 && (
+                    <span className="mt-0.5 block pl-5 text-[13px] text-muted-foreground">
+                      Options:{" "}
+                      {item.addOns.map((addon) => addon.optionName).join(", ")}
+                    </span>
+                  )}
+                  {item.productAnswers.length > 0 && (
+                    <span className="mt-0.5 block pl-5 text-[13px] text-muted-foreground">
+                      {item.productAnswers.map((answer) => (
+                        <span
+                          key={answer.questionId}
+                          className="block break-words"
+                        >
+                          {answer.label}:{" "}
+                          {answer.value === "true"
+                            ? "Yes"
+                            : answer.value === "false"
+                              ? "No"
+                              : answer.value}
+                        </span>
+                      ))}
+                    </span>
+                  )}
+                  {order.attachments
+                    .filter((attachment) => attachment.orderItemId === item.id)
+                    .map((attachment) => (
+                      <a
+                        key={attachment.id}
+                        href={`/api/orders/${order.id}/attachments/${attachment.id}`}
+                        className="mt-1 block break-all pl-5 text-[13px] font-medium text-primary underline underline-offset-2"
+                      >
+                        {attachment.questionLabel}: {attachment.fileName}
+                      </a>
+                    ))}
                   {item.specialInstructions && (
                     <span className="mt-0.5 block pl-5 text-[13px] text-muted-foreground">
                       {item.specialInstructions}
@@ -239,17 +354,46 @@ function OrderRow({
               Note: {order.notes}
             </p>
           )}
+          {order.formAnswers?.map((answer) => (
+            <p
+              key={answer.questionId}
+              className="break-words pb-2 text-sm text-muted-foreground"
+            >
+              {answer.label}: {answer.value}
+            </p>
+          ))}
+          {order.attachments
+            .filter((attachment) => attachment.orderItemId === null)
+            .map((attachment) => (
+              <a
+                key={attachment.id}
+                href={`/api/orders/${order.id}/attachments/${attachment.id}`}
+                className="block break-all pb-2 text-sm font-medium text-primary underline underline-offset-2"
+              >
+                {attachment.questionLabel}: {attachment.fileName}
+              </a>
+            ))}
         </details>
       </div>
 
       <div className="flex min-w-0 flex-col justify-end gap-3 border-t border-border pt-3 md:border-t-0 md:pt-0">
+        {order.paymentProof && (
+          <PaymentProofDialog
+            orderId={order.id}
+            uploadedAt={order.paymentProof.createdAt}
+          />
+        )}
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-muted/50 px-3 py-2.5">
           <div className="min-w-0 text-sm">
             <p className="font-medium">
               {order.paymentMethod === "GCASH" ? "GCash" : "Cash"}
             </p>
             <p className="text-xs text-muted-foreground">
-              {order.paymentStatus === "PAID" ? "Paid" : "Payment not verified"}
+              {order.paymentStatus === "PAID"
+                ? "Paid"
+                : order.paymentProof
+                  ? "Proof received · review before confirming"
+                  : "Payment not verified"}
             </p>
           </div>
           <Button
@@ -444,7 +588,7 @@ function OrderRow({
               <X className="size-4" aria-hidden="true" />
             )}
             {order.status === "COMPLETED"
-              ? "Order complete"
+              ? `Order ${labels.COMPLETED.toLowerCase()}`
               : "Order cancelled"}
           </p>
         )}
@@ -464,7 +608,7 @@ function OrderRow({
               Order #{order.id}
             </h2>
             <Badge variant="outline" className={statusStyle[order.status]}>
-              {statusLabel[order.status]}
+              {labels[order.status]}
             </Badge>
             {nextActionLabel && (
               <span className="text-[13px] font-medium text-primary">
@@ -657,10 +801,12 @@ function PaymentFilterBar({
 
 function HistoryQueue({
   storeId,
+  workflow,
   initialPage,
   onSuccess,
 }: {
   storeId: string;
+  workflow: OrderWorkflow;
   initialPage: PastOrdersPage;
   onSuccess: (message: string) => void;
 }) {
@@ -719,7 +865,12 @@ function HistoryQueue({
       {page.orders.length ? (
         <div className="space-y-3 sm:space-y-4">
           {page.orders.map((order) => (
-            <OrderRow key={order.id} order={order} onSuccess={onSuccess} />
+            <OrderRow
+              key={order.id}
+              order={order}
+              workflow={workflow}
+              onSuccess={onSuccess}
+            />
           ))}
         </div>
       ) : (
@@ -789,6 +940,12 @@ export function OrdersBoard({
   const [refreshPending, startRefresh] = useTransition();
   const previousLoadedAt = useRef(loadedAt);
   const router = useRouter();
+  const workflow = catalog.store.orderWorkflow;
+  const labels = workflow.labels ?? defaultStatusLabel;
+  const displayedQueues = queues.map((item) => ({
+    ...item,
+    label: item.id === "HISTORY" ? item.label : labels[item.id],
+  }));
 
   useEffect(() => {
     let active = true;
@@ -892,7 +1049,7 @@ export function OrdersBoard({
           role="group"
           aria-label="Filter orders by status"
         >
-          {queues.map((item) => (
+          {displayedQueues.map((item) => (
             <button
               key={item.id}
               type="button"
@@ -900,7 +1057,7 @@ export function OrdersBoard({
               onClick={() => setQueue(item.id)}
               className={`flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-ring ${queue === item.id ? "bg-secondary text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
             >
-              {item.label}
+              {item.id === "HISTORY" ? item.label : labels[item.id]}
               <span className="text-xs tabular-nums opacity-75">
                 {counts[item.id]}
               </span>
@@ -956,6 +1113,7 @@ export function OrdersBoard({
         <HistoryQueue
           key={loadedAt}
           storeId={storeId}
+          workflow={workflow}
           initialPage={initialHistoryPage}
           onSuccess={setAnnouncement}
         />
@@ -970,7 +1128,7 @@ export function OrdersBoard({
               setAnnouncement(
                 filter === "ALL"
                   ? "Showing all payment statuses in this queue."
-                  : `Showing ${unpaidCount} unpaid ${queues.find((item) => item.id === queue)?.label.toLowerCase()} ${unpaidCount === 1 ? "order" : "orders"}.`,
+                  : `Showing ${unpaidCount} unpaid ${labels[queue].toLowerCase()} ${unpaidCount === 1 ? "order" : "orders"}.`,
               );
             }}
           />
@@ -985,8 +1143,9 @@ export function OrdersBoard({
                     order.status === "NEW" && order.id === initialOrderId
                   }
                   nextActionLabel={
-                    index === 0 ? nextQueueAction[queue] : undefined
+                    index === 0 ? nextQueueAction(queue, labels) : undefined
                   }
+                  workflow={workflow}
                   onSuccess={setAnnouncement}
                 />
               ))}
@@ -998,7 +1157,7 @@ export function OrdersBoard({
                   ? "No unpaid orders"
                   : orders.length === 0
                     ? "No orders yet"
-                    : `No ${queues.find((item) => item.id === queue)?.label.toLowerCase()} orders`}
+                    : `No ${labels[queue].toLowerCase()} orders`}
               </h2>
               <p className="mt-1 max-w-md text-sm leading-relaxed text-muted-foreground">
                 {paymentFilter === "UNPAID" && queueOrders.length > 0

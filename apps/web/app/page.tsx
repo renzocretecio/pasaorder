@@ -1,30 +1,23 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import {
-  ArrowRight,
-  ArrowUpRight,
-  Check,
-  MessageCircleMore,
-  QrCode,
-} from "lucide-react";
+import { ArrowRight, ArrowUpRight, Check, QrCode } from "lucide-react";
 import { Brand } from "@/components/brand";
 import s from "./landing.module.css";
 import { LandingMotion } from "@/features/landing/landing-motion";
-import { OrderJourney } from "@/features/landing/order-journey";
 
 export const metadata: Metadata = {
-  title: "PasaOrder | Orders made simple, from chat to checkout",
+  title: "PasaOrder | Orders made simple, from catalog to checkout",
   description:
-    "Publish a menu, take orders through a QR code or link, and review Messenger order conversations in one simple workspace for your store.",
+    "Share a simple online catalog, collect customer choices, and manage every order in one workspace built for small businesses.",
   alternates: { canonical: "/" },
   openGraph: {
     type: "website",
     locale: "en_PH",
     siteName: "PasaOrder",
-    title: "Orders made simple, from chat to checkout | PasaOrder",
+    title: "Orders made simple, from catalog to checkout | PasaOrder",
     description:
-      "Publish a menu, take orders through a QR code or link, and review Messenger order conversations in one simple workspace for your store.",
+      "Share a simple online catalog, collect customer choices, and manage every order in one workspace built for small businesses.",
     url: "/",
     images: [
       {
@@ -37,23 +30,23 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Orders made simple, from chat to checkout | PasaOrder",
+    title: "Orders made simple, from catalog to checkout | PasaOrder",
     description:
-      "Publish a menu, take orders through a QR code or link, and review Messenger order conversations in one simple workspace for your store.",
+      "Share a simple online catalog, collect customer choices, and manage every order in one workspace built for small businesses.",
     images: ["/images/landing/merchant-counter.webp"],
   },
 };
 
 const steps = [
   {
-    title: "Make your menu yours.",
+    title: "Make your catalog yours.",
     description:
-      "Add products, prices, and photos. Publish a menu that feels like your store, with a link and QR code ready to share.",
+      "Add products, prices, and photos. Publish a catalog that feels like your business, with a link and QR code ready to share.",
   },
   {
     title: "Let customers order their way.",
     description:
-      "Customers can order from your menu for pickup, delivery, or dine-in. They can choose cash or follow your GCash instructions.",
+      "Customers choose product options, answer the details you need, and place an order for pickup, delivery, or dine-in.",
   },
   {
     title: "Keep every order moving.",
@@ -76,7 +69,6 @@ export default function Home() {
             </Link>
             <nav className={s.desktopNav} aria-label="Main navigation">
               <a href="#how-it-works">How it works</a>
-              <a href="#messenger">Messenger orders</a>
               <a href="#for-your-store">For your store</a>
             </nav>
             <div className={s.headerActions}>
@@ -97,13 +89,13 @@ export default function Home() {
                 <h1 id="hero-title">
                   Orders made simple,
                   <br />
-                  <span>from chat to checkout.</span>
+                  <span>from catalog to checkout.</span>
                 </h1>
                 <div className={s.heroSupport}>
                   <p>
-                    Give customers an easy way to order from your menu. Bring
-                    QR, link, and Messenger orders together so you can focus on
-                    running your store.
+                    Give customers an easy way to order from your business.
+                    Share a catalog, collect the choices and details you need,
+                    and manage every order in one simple workspace.
                   </p>
                   <div className={s.heroActions}>
                     <Link href="/register" className={s.primaryCta}>
@@ -116,7 +108,7 @@ export default function Home() {
                     </a>
                   </div>
                   <span className={s.heroFootnote}>
-                    Made for small stores with a menu or catalog.
+                    Made for independent shops, sellers, and local businesses.
                   </span>
                 </div>
               </div>
@@ -136,11 +128,14 @@ export default function Home() {
             </div>
           </section>
 
-          <div className={s.handoff} aria-label="From menu or chat to orders">
+          <div
+            className={s.handoff}
+            aria-label="From catalog to order management"
+          >
             <div className={s.handoffInner}>
-              <span>Menu or Messenger</span>
+              <span>Online catalog</span>
               <ArrowRight aria-hidden="true" />
-              <span>Owner review</span>
+              <span>Customer checkout</span>
               <ArrowRight aria-hidden="true" />
               <span>One order queue</span>
             </div>
@@ -156,8 +151,8 @@ export default function Home() {
                 One clear path, from first tap to fulfilled order.
               </h2>
               <p>
-                PasaOrder keeps the everyday parts of taking orders connected,
-                without making your store learn a complicated system.
+                PasaOrder connects your products, customer choices, and order
+                queue without making your business learn a complicated system.
               </p>
             </div>
             <div className={s.steps}>
@@ -191,56 +186,27 @@ export default function Home() {
               <div className={s.featureIcon} aria-hidden="true">
                 <QrCode size={23} strokeWidth={1.8} />
               </div>
-              <h2 id="menu-title">Your store, one scan away.</h2>
+              <h2 id="menu-title">Your catalog, one scan away.</h2>
               <p>
-                Share a QR code at the counter or send your menu link anywhere.
-                Customers browse what is available, choose their options, and
-                place an order on their phone—no customer account needed.
+                Share a QR code or send your catalog link anywhere. Customers
+                browse what is available, choose product options, add an
+                optional note, and submit from their phone.
               </p>
               <ul className={s.checkList}>
                 <li>
-                  <Check aria-hidden="true" /> Your own store profile and
-                  catalog
+                  <Check aria-hidden="true" /> A shareable storefront for your
+                  products
                 </li>
                 <li>
-                  <Check aria-hidden="true" /> Sizes, piece options, photos, and
-                  availability
+                  <Check aria-hidden="true" /> Sizes, colors, extras, photos,
+                  and availability
                 </li>
                 <li>
-                  <Check aria-hidden="true" /> Pickup, delivery, and dine-in
-                  options
+                  <Check aria-hidden="true" /> Pickup, delivery, or dine-in
+                  options with simple order notes
                 </li>
               </ul>
             </div>
-          </section>
-
-          <section
-            id="messenger"
-            className={s.chatSection}
-            aria-labelledby="chat-title"
-          >
-            <div className={s.chatIntro} data-reveal>
-              <div>
-                <div className={s.featureIcon} aria-hidden="true">
-                  <MessageCircleMore size={23} strokeWidth={1.8} />
-                </div>
-                <h2 id="chat-title">
-                  When an order starts in Messenger, it still belongs with your
-                  orders.
-                </h2>
-              </div>
-              <p>
-                Connect your Facebook Page to see customer conversations in
-                PasaOrder. Possible orders are surfaced for review; assisted
-                extraction prepares an editable draft. You check the items and
-                confirm the order yourself.
-              </p>
-            </div>
-            <OrderJourney />
-            <p className={s.exampleNote}>
-              Fictional example. No real customer conversation or order is
-              shown.
-            </p>
           </section>
 
           <section className={s.close} aria-labelledby="close-title">
@@ -250,7 +216,7 @@ export default function Home() {
                   A simpler day starts with one place for orders.
                 </h2>
                 <p>
-                  Set up your store, share your menu, and keep things moving.
+                  Set up your catalog, share your link, and keep orders moving.
                 </p>
               </div>
               <Link href="/register" className={s.closeCta}>

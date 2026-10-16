@@ -9,10 +9,10 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const { store } = await getPublicCatalog(slug);
-  const title = `${store.name} menu | PasaOrder`;
+  const title = `${store.name} catalog | PasaOrder`;
   const description =
     store.description?.trim() ||
-    `Browse ${store.name}'s menu and place an order online with PasaOrder.`;
+    `Browse ${store.name}'s catalog and place an order online with PasaOrder.`;
   const url = `/menu/${encodeURIComponent(store.slug)}`;
   const image =
     store.bannerUrl || store.logoUrl || "/images/landing/merchant-counter.webp";
@@ -28,7 +28,7 @@ export async function generateMetadata({
       title,
       description,
       url,
-      images: [{ url: image, alt: `${store.name} menu` }],
+      images: [{ url: image, alt: `${store.name} catalog` }],
     },
     twitter: {
       card: "summary_large_image",
@@ -39,7 +39,7 @@ export async function generateMetadata({
   };
 }
 
-export default async function PublicMenu({
+export default async function PublicCatalog({
   params,
 }: {
   params: Promise<{ slug: string }>;

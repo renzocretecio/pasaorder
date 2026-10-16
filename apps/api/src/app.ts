@@ -10,15 +10,7 @@ app.disable("x-powered-by");
 app.use(helmet());
 app.use(cors({ origin: env.WEB_ORIGIN }));
 app.use("/api/catalog/stores/:id/items/import", express.json({ limit: "8mb" }));
-app.use(
-  express.json({
-    limit: "100kb",
-    verify: (request, _response, body) => {
-      (request as typeof request & { rawBody?: Buffer }).rawBody =
-        Buffer.from(body);
-    },
-  }),
-);
+app.use(express.json({ limit: "100kb" }));
 app.get("/api/health", (_req, res) =>
   res.json({ status: "ok", service: "pasaorder-api" }),
 );

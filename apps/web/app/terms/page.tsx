@@ -7,14 +7,14 @@ import {
 export const metadata: Metadata = {
   title: "Terms of Service | PasaOrder",
   description:
-    "Terms for using the PasaOrder menu and order management service.",
+    "Terms for using the PasaOrder storefront and order management service.",
   alternates: { canonical: "/terms" },
   openGraph: {
     type: "website",
     siteName: "PasaOrder",
     title: "Terms of Service | PasaOrder",
     description:
-      "Terms for using the PasaOrder menu and order management service.",
+      "Terms for using the PasaOrder storefront and order management service.",
     url: "/terms",
     images: ["/images/landing/merchant-counter.webp"],
   },
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Terms of Service | PasaOrder",
     description:
-      "Terms for using the PasaOrder menu and order management service.",
+      "Terms for using the PasaOrder storefront and order management service.",
     images: ["/images/landing/merchant-counter.webp"],
   },
 };
@@ -33,10 +33,10 @@ const sections: LegalSection[] = [
     content: (
       <p>
         These Terms apply when you access or use PasaOrder, including its store
-        owner workspace, public menus, checkout, and chat-assisted order tools.
-        By using the service, you agree to these Terms. If you use PasaOrder for
-        a business, you confirm that you are authorized to act for it. You must
-        be legally able to enter into this agreement.
+        owner workspace, public catalogs, checkout, and order management. By
+        using the service, you agree to these Terms. If you use PasaOrder for a
+        business, you confirm that you are authorized to act for it. You must be
+        legally able to enter into this agreement.
       </p>
     ),
   },
@@ -45,7 +45,7 @@ const sections: LegalSection[] = [
     content: (
       <p>
         PasaOrder gives store owners tools to publish catalogs, receive customer
-        orders, and manage order conversations. Customers may use a public store
+        orders, and manage their order queue. Customers may use a public store
         link or QR code to view a catalog and submit an order. Features may
         change as the service develops. Some integrations require separate
         accounts, permissions, or approval from third-party providers.
@@ -68,13 +68,13 @@ const sections: LegalSection[] = [
           payment instructions, and fulfillment options accurate.
         </li>
         <li>
-          Review orders and AI-assisted drafts before confirming them, and
-          handle customer requests, payment verification, fulfillment, refunds,
-          and required notices for your business.
+          Review orders before confirming them, and handle customer requests,
+          payment verification, fulfillment, refunds, and required notices for
+          your business.
         </li>
         <li>
-          Follow applicable laws and the terms of Meta, Google, and any payment
-          or communications services you use.
+          Follow applicable laws and the terms of Google and any payment
+          services you use.
         </li>
       </ul>
     ),
@@ -91,20 +91,6 @@ const sections: LegalSection[] = [
         customers pay the store directly and the store verifies payment.
         PasaOrder currently does not represent that it processes or settles
         those payments.
-      </p>
-    ),
-  },
-  {
-    title: "Messenger and AI-assisted drafts",
-    content: (
-      <p>
-        Connected Messenger conversations may be sorted into review queues. When
-        an owner requests or triggers order review, PasaOrder may use an AI
-        provider to suggest an editable draft based on conversation text and the
-        store catalog. AI suggestions can be wrong or incomplete. The owner is
-        responsible for checking the details and explicitly confirming an order.
-        PasaOrder does not automatically send AI-generated replies or turn a
-        draft into a confirmed order.
       </p>
     ),
   },
@@ -153,12 +139,11 @@ const sections: LegalSection[] = [
       <p>
         To the extent permitted by applicable law, PasaOrder is provided as
         available, without warranties that the service will meet every business
-        requirement or that AI suggestions, third-party integrations, or order
-        information will always be accurate or available. Nothing in these Terms
-        excludes liability that cannot lawfully be excluded. To the extent
-        permitted by law, PasaOrder is not responsible for disputes between a
-        store and its customers, including product quality, pricing,
-        fulfillment, or payment disputes.
+        requirement or that order information will always be accurate or
+        available. Nothing in these Terms excludes liability that cannot
+        lawfully be excluded. To the extent permitted by law, PasaOrder is not
+        responsible for disputes between a store and its customers, including
+        product quality, pricing, fulfillment, or payment disputes.
       </p>
     ),
   },

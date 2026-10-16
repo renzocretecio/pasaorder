@@ -54,6 +54,12 @@ export function ManualOrderCreate({ catalog }: { catalog: Catalog }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [discardId, setDiscardId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [pendingChoice, setPendingChoice] = useState<
+    (Line & { category: string }) | null
+  >(null);
+  const [pendingAddOns, setPendingAddOns] = useState<
+    { groupId: string; optionId: string }[]
+  >([]);
   const [lines, setLines] = useState<Line[]>([]);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -103,12 +109,32 @@ export function ManualOrderCreate({ catalog }: { catalog: Catalog }) {
   const priceFor = (line: Line) => {
     const product = products.find((item) => item.id === line.productId);
     if (!product?.isAvailable) return null;
-    if (product.variants.length)
-      return (
-        product.variants.find((variant) => variant.id === line.variantId)
-          ?.price ?? null
+    const base = product.variants.length
+      ? (product.variants.find((variant) => variant.id === line.variantId)
+          ?.price ?? null)
+      : line.variantId
+        ? null
+        : product.price;
+    if (base === null) return null;
+    const selectedAddOns = line.addOns ?? [];
+    for (const group of product.addOnGroups) {
+      const selectedInGroup = selectedAddOns.filter(
+        (choice) => choice.groupId === group.id,
       );
-    return line.variantId ? null : product.price;
+      if (
+        (group.required && selectedInGroup.length === 0) ||
+        (group.selection === "SINGLE" && selectedInGroup.length > 1)
+      )
+        return null;
+    }
+    const extra = (line.addOns ?? []).reduce((sum, selected) => {
+      const option = product.addOnGroups
+        .find((group) => group.id === selected.groupId)
+        ?.options.find((item) => item.id === selected.optionId);
+      return option ? sum + Math.round(Number(option.price) * 100) : Number.NaN;
+    }, 0);
+    if (!Number.isFinite(extra)) return null;
+    return ((Math.round(Number(base) * 100) + extra) / 100).toFixed(2);
   };
   const conflicts = lines.some(
     (line) =>
@@ -273,6 +299,8 @@ export function ManualOrderCreate({ catalog }: { catalog: Catalog }) {
   function reset() {
     setLines([]);
     setSearch("");
+    setPendingChoice(null);
+    setPendingAddOns([]);
     setCustomerName("");
     setCustomerPhone("");
     setNotes("");
@@ -302,7 +330,9 @@ export function ManualOrderCreate({ catalog }: { catalog: Catalog }) {
       const index = current.findIndex(
         (line) =>
           line.productId === choice.productId &&
-          line.variantId === choice.variantId,
+          line.variantId === choice.variantId &&
+          JSON.stringify(line.addOns ?? []) ===
+            JSON.stringify(choice.addOns ?? []),
       );
       if (index >= 0)
         return current.map((line, position) =>
@@ -313,6 +343,15 @@ export function ManualOrderCreate({ catalog }: { catalog: Catalog }) {
       return current.length >= 100 ? current : [...current, choice];
     });
     setMessage("");
+  }
+  function chooseManualProduct(choice: Line & { category: string }) {
+    const product = products.find((item) => item.id === choice.productId);
+    if (!product?.addOnGroups.length) {
+      addLine({ ...choice, addOns: [] });
+      return;
+    }
+    setPendingChoice(choice);
+    setPendingAddOns([]);
   }
   function queueChange(
     change: (current: SavedManualOrder[]) => SavedManualOrder[],
@@ -405,6 +444,7 @@ export function ManualOrderCreate({ catalog }: { catalog: Catalog }) {
         productId: line.productId,
         variantId: line.variantId,
         quantity: line.quantity,
+        addOns: line.addOns ?? [],
         expectedUnitPrice: line.expectedUnitPrice,
       })),
     });
@@ -736,7 +776,7 @@ export function ManualOrderCreate({ catalog }: { catalog: Catalog }) {
                           type="button"
                           key={`${choice.productId}:${choice.variantId}`}
                           className="flex min-h-14 w-full items-center gap-3 border-b border-border px-3 py-2 text-left last:border-0 hover:bg-secondary focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
-                          onClick={() => addLine(choice)}
+                          onClick={() => chooseManualProduct(choice)}
                           disabled={
                             lines.length >= 100 &&
                             !lines.some(
@@ -772,6 +812,181 @@ export function ManualOrderCreate({ catalog }: { catalog: Catalog }) {
                       </p>
                     )}
                   </div>
+                  {pendingChoice &&
+                    (() => {
+                      const product = products.find(
+                        (item) => item.id === pendingChoice.productId,
+                      )!;
+                      return (
+                        <section
+                          className="space-y-3 rounded-xl border border-primary/30 bg-secondary/40 p-3"
+                          aria-label="Configure product add-ons"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="font-semibold">
+                              Options for {pendingChoice.name}
+                            </p>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setPendingChoice(null)}
+                              aria-label="Close add-on options"
+                            >
+                              <X />
+                            </Button>
+                          </div>
+                          {product.addOnGroups.map((group) => (
+                            <fieldset key={group.id} className="space-y-1">
+                              <legend className="mb-1 text-sm font-medium">
+                                {group.name}
+                                {group.required ? " · Required" : " · Optional"}
+                              </legend>
+                              {group.selection === "SINGLE" &&
+                                !group.required && (
+                                  <label className="flex min-h-10 items-center gap-2 text-sm">
+                                    <input
+                                      type="radio"
+                                      name={`manual-addon-${group.id}`}
+                                      checked={
+                                        !pendingAddOns.some(
+                                          (choice) =>
+                                            choice.groupId === group.id,
+                                        )
+                                      }
+                                      onChange={() =>
+                                        setPendingAddOns((current) =>
+                                          current.filter(
+                                            (choice) =>
+                                              choice.groupId !== group.id,
+                                          ),
+                                        )
+                                      }
+                                    />
+                                    <span>No thanks</span>
+                                  </label>
+                                )}
+                              {group.options.map((option) => {
+                                const selected = pendingAddOns.some(
+                                  (choice) =>
+                                    choice.groupId === group.id &&
+                                    choice.optionId === option.id,
+                                );
+                                return (
+                                  <label
+                                    key={option.id}
+                                    className="flex min-h-10 items-center gap-2 text-sm"
+                                  >
+                                    <input
+                                      type={
+                                        group.selection === "SINGLE"
+                                          ? "radio"
+                                          : "checkbox"
+                                      }
+                                      name={`manual-addon-${group.id}`}
+                                      checked={selected}
+                                      onChange={() =>
+                                        setPendingAddOns((current) =>
+                                          selected
+                                            ? current.filter(
+                                                (choice) =>
+                                                  !(
+                                                    choice.groupId ===
+                                                      group.id &&
+                                                    choice.optionId ===
+                                                      option.id
+                                                  ),
+                                              )
+                                            : [
+                                                ...current.filter(
+                                                  (choice) =>
+                                                    choice.groupId !==
+                                                      group.id ||
+                                                    group.selection ===
+                                                      "MULTIPLE",
+                                                ),
+                                                {
+                                                  groupId: group.id,
+                                                  optionId: option.id,
+                                                },
+                                              ],
+                                        )
+                                      }
+                                    />{" "}
+                                    <span className="flex-1">
+                                      {option.name}
+                                    </span>
+                                    <span>+{peso(option.price)}</span>
+                                  </label>
+                                );
+                              })}
+                            </fieldset>
+                          ))}
+                          <Button
+                            type="button"
+                            className="min-h-11 w-full"
+                            disabled={product.addOnGroups.some(
+                              (group) =>
+                                group.required &&
+                                !pendingAddOns.some(
+                                  (choice) => choice.groupId === group.id,
+                                ),
+                            )}
+                            onClick={() => {
+                              const labels = pendingAddOns
+                                .map(
+                                  (selected) =>
+                                    product.addOnGroups
+                                      .find(
+                                        (group) =>
+                                          group.id === selected.groupId,
+                                      )
+                                      ?.options.find(
+                                        (item) => item.id === selected.optionId,
+                                      )?.name,
+                                )
+                                .filter((label): label is string => !!label);
+                              const extra = pendingAddOns.reduce(
+                                (sum, selected) => {
+                                  const option = product.addOnGroups
+                                    .find(
+                                      (group) => group.id === selected.groupId,
+                                    )
+                                    ?.options.find(
+                                      (item) => item.id === selected.optionId,
+                                    );
+                                  return (
+                                    sum +
+                                    (option
+                                      ? Math.round(Number(option.price) * 100)
+                                      : 0)
+                                  );
+                                },
+                                0,
+                              );
+                              addLine({
+                                ...pendingChoice,
+                                name: labels.length
+                                  ? `${pendingChoice.name} · ${labels.join(", ")}`
+                                  : pendingChoice.name,
+                                addOns: pendingAddOns,
+                                expectedUnitPrice: (
+                                  (Math.round(
+                                    Number(pendingChoice.expectedUnitPrice) *
+                                      100,
+                                  ) +
+                                    extra) /
+                                  100
+                                ).toFixed(2),
+                              });
+                              setPendingChoice(null);
+                            }}
+                          >
+                            Add item
+                          </Button>
+                        </section>
+                      );
+                    })()}
                 </fieldset>
                 <section aria-label="Order items">
                   <h3 className="font-semibold">

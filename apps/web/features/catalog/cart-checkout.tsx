@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Check, Copy, Minus, Plus, ShoppingBag } from "lucide-react";
 import { Dialog } from "radix-ui";
 import type {
+  BusinessCategory,
   OrderType,
   PaymentInstructions,
   PaymentMethod,
@@ -149,6 +150,7 @@ export function CartCheckout({
   open,
   onOpenChange,
   storeSlug,
+  businessCategory,
   storeOrderTypes,
   storePaymentMethods,
   gcashInstructions,
@@ -164,6 +166,7 @@ export function CartCheckout({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   storeSlug: string;
+  businessCategory: BusinessCategory;
   storeOrderTypes: OrderType[];
   storePaymentMethods: PaymentMethod[];
   gcashInstructions: Omit<
@@ -179,6 +182,8 @@ export function CartCheckout({
   orderType: OrderType;
   setOrderType: (value: OrderType) => void;
 }) {
+  const supportsTableNumber =
+    businessCategory === "FOOD_BEVERAGE" || businessCategory === "BAKERY";
   const [step, setStep] = useState<"cart" | "checkout" | "placed">("cart");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -195,7 +200,15 @@ export function CartCheckout({
   const cartQuantity = cart.reduce((sum, line) => sum + line.quantity, 0);
   const subtotalCents = cart.reduce(
     (sum, line) =>
-      sum + cents(line.variant?.price ?? line.item.price) * line.quantity,
+      sum +
+      (cents(line.variant?.price ?? line.item.price) +
+        line.addOns.reduce((extra, choice) => {
+          const option = line.item.addOnGroups
+            .find((group) => group.id === choice.groupId)
+            ?.options.find((entry) => entry.id === choice.optionId);
+          return extra + (option ? cents(option.price) : 0);
+        }, 0)) *
+        line.quantity,
     0,
   );
   const subtotal = peso((subtotalCents / 100).toFixed(2));
@@ -243,32 +256,34 @@ export function CartCheckout({
     const requestKey = checkoutRequestKey(storeSlug, idempotencyKey, storage);
     setIdempotencyKey(requestKey);
     try {
+      const orderPayload = {
+        storeSlug,
+        idempotencyKey: requestKey,
+        customerName: name,
+        customerPhone:
+          orderType === "DINE_IN" ? undefined : phone.trim() || undefined,
+        orderType,
+        paymentMethod,
+        tableNumber:
+          orderType === "DINE_IN" && supportsTableNumber
+            ? tableNumber.trim() || undefined
+            : undefined,
+        deliveryAddress: orderType === "DELIVERY" ? address : undefined,
+        notes: notes || undefined,
+        items: cart.map((line) => ({
+          productId: line.item.id,
+          variantId: line.variant?.id ?? null,
+          quantity: line.quantity,
+          specialInstructions: line.instructions || undefined,
+          addOns: line.addOns,
+        })),
+      };
       const response = await fetch("/api/orders", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          storeSlug,
-          idempotencyKey: requestKey,
-          customerName: name,
-          customerPhone:
-            orderType === "DINE_IN" ? undefined : phone.trim() || undefined,
-          orderType,
-          paymentMethod,
-          tableNumber:
-            orderType === "DINE_IN"
-              ? tableNumber.trim() || undefined
-              : undefined,
-          deliveryAddress: orderType === "DELIVERY" ? address : undefined,
-          notes: notes || undefined,
-          items: cart.map((line) => ({
-            productId: line.item.id,
-            variantId: line.variant?.id ?? null,
-            quantity: line.quantity,
-            specialInstructions: line.instructions || undefined,
-          })),
-        }),
+        body: JSON.stringify(orderPayload),
       });
-      const body = await response.json().catch(() => null);
+      const result = await response.json().catch(() => null);
       if (!response.ok) {
         // A definite client rejection can be corrected with a new attempt.
         // Network/server failures keep the key because the order may exist.
@@ -281,14 +296,14 @@ export function CartCheckout({
           setIdempotencyKey(null);
         }
         throw new Error(
-          body?.message ?? "We couldn’t place your order. Please try again.",
+          result?.message ?? "We couldn’t place your order. Please try again.",
         );
       }
-      if (!body?.order?.trackingToken)
+      if (!result?.order?.trackingToken)
         throw new Error(
           "We couldn’t confirm the result. Please retry to check your order.",
         );
-      setPlacedOrder(body.order as PlacedOrder);
+      setPlacedOrder(result.order as PlacedOrder);
       setCart([]);
       setIdempotencyKey(null);
       clearCheckoutRequest(storeSlug, storage);
@@ -321,7 +336,7 @@ export function CartCheckout({
             >
               {!online
                 ? "You’re offline. Keep editing your cart and reconnect before placing your order."
-                : "Refreshing the menu after reconnecting…"}
+                : "Refreshing the catalog after reconnecting…"}
             </p>
           )}
           {step === "placed" && placedOrder ? (
@@ -356,7 +371,8 @@ export function CartCheckout({
                   <span className="text-[#59685d]">Order number</span>
                   <span className="font-semibold">#{placedOrder.id}</span>
                 </div>
-                {placedOrder.orderType === "DINE_IN" &&
+                {supportsTableNumber &&
+                  placedOrder.orderType === "DINE_IN" &&
                   placedOrder.tableNumber && (
                     <div className="mt-2 flex justify-between gap-4 text-sm">
                       <span className="text-[#59685d]">Table</span>
@@ -466,7 +482,7 @@ export function CartCheckout({
                     />
                   </div>
                 )}
-                {orderType === "DINE_IN" && (
+                {supportsTableNumber && orderType === "DINE_IN" && (
                   <div>
                     <label
                       htmlFor="checkout-table-number"
@@ -601,7 +617,7 @@ export function CartCheckout({
                     : !online
                       ? "Reconnect to place order"
                       : refreshing
-                        ? "Refreshing menu…"
+                        ? "Refreshing catalog…"
                         : `Place order · ${subtotal}`}
                 </Button>
                 <p className="mt-2 text-center text-xs text-[#59685d]">
@@ -664,6 +680,41 @@ export function CartCheckout({
                           {line.variant ? `${line.variant.label} · ` : ""}
                           {peso(line.variant?.price ?? line.item.price)} each
                         </p>
+                        {line.addOns.length > 0 && (
+                          <p className="mt-1 text-[13px] text-[#59685d]">
+                            Add-ons:{" "}
+                            {line.addOns
+                              .map(
+                                (choice) =>
+                                  line.item.addOnGroups
+                                    .find(
+                                      (group) => group.id === choice.groupId,
+                                    )
+                                    ?.options.find(
+                                      (option) => option.id === choice.optionId,
+                                    )?.name,
+                              )
+                              .filter(Boolean)
+                              .join(", ")}
+                          </p>
+                        )}
+                        {line.answers.length > 0 && (
+                          <div className="mt-1 space-y-0.5 text-[13px] text-[#59685d]">
+                            {line.answers.map((answer) => (
+                              <p
+                                key={answer.questionId}
+                                className="break-words"
+                              >
+                                {answer.label}:{" "}
+                                {answer.value === "true"
+                                  ? "Yes"
+                                  : answer.value === "false"
+                                    ? "No"
+                                    : answer.value}
+                              </p>
+                            ))}
+                          </div>
+                        )}
                         {line.instructions && (
                           <p className="mt-1 break-words text-[13px] text-[#59685d]">
                             Note: {line.instructions}
@@ -692,8 +743,27 @@ export function CartCheckout({
                           <span className="ml-auto font-semibold tabular-nums text-[var(--store-accent-ink)]">
                             {peso(
                               String(
-                                Number(line.variant?.price ?? line.item.price) *
-                                  line.quantity,
+                                ((cents(
+                                  line.variant?.price ?? line.item.price,
+                                ) +
+                                  line.addOns.reduce(
+                                    (extra, choice) =>
+                                      extra +
+                                      cents(
+                                        line.item.addOnGroups
+                                          .find(
+                                            (group) =>
+                                              group.id === choice.groupId,
+                                          )
+                                          ?.options.find(
+                                            (option) =>
+                                              option.id === choice.optionId,
+                                          )?.price ?? "0",
+                                      ),
+                                    0,
+                                  )) *
+                                  line.quantity) /
+                                  100,
                               ),
                             )}
                           </span>

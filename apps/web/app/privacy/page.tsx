@@ -36,15 +36,18 @@ const sections: LegalSection[] = [
           Depending on how you use PasaOrder, information may include account
           name and email, authentication identifiers, store name and settings,
           catalog text and images, customer names and contact details, delivery
-          addresses, table numbers, order contents, payment status, and messages
-          sent to a store through its public chat or connected Facebook Page.
+          addresses, table numbers, order contents, and payment status. Some
+          historical orders may also include files that customers sent while
+          custom upload fields were available. Customers may also upload GCash
+          payment proof images for an order; these images are private and are
+          made available to the store owner for manual verification. PasaOrder
+          currently supports ordering through a store catalog or link and manual
+          order entry by the store owner.
         </p>
         <p>
           We also receive technical information needed to operate and protect
-          the service, such as request, device, and diagnostic data. When an
-          owner connects a Facebook Page, Meta provides Page and messaging
-          information needed to receive and reply to messages. Meta may provide
-          a customer profile name when available.
+          the service, such as request, device, and diagnostic data. PasaOrder
+          does not currently connect to Facebook or Instagram messaging.
         </p>
       </>
     ),
@@ -55,12 +58,8 @@ const sections: LegalSection[] = [
       <ul className="list-disc space-y-2 pl-5">
         <li>To create accounts and authenticate store owners.</li>
         <li>
-          To publish menus, accept customer orders, and help stores manage them.
-        </li>
-        <li>To deliver Messenger messages and owner-initiated replies.</li>
-        <li>
-          To sort conversations into review queues and, when an owner reviews a
-          chat and Gemini is configured, prepare an editable order draft.
+          To publish catalogs, accept customer orders, and help stores manage
+          them.
         </li>
         <li>To maintain, troubleshoot, secure, and improve PasaOrder.</li>
         <li>To respond to support, privacy, and legal requests.</li>
@@ -68,25 +67,16 @@ const sections: LegalSection[] = [
     ),
   },
   {
-    title: "AI-assisted conversation review",
+    title: "Previously collected conversation data",
     content: (
-      <>
-        <p>
-          PasaOrder uses a conversation classifier to help sort chats. When a
-          store owner opens or retries an eligible conversation for order
-          review, the conversation text and relevant store catalog context may
-          be sent to Google Gemini to prepare a structured draft. Gemini is not
-          the source of truth for products, prices, or availability. PasaOrder
-          checks draft items against the store catalog, and the owner reviews
-          and confirms any order. We do not use this feature to automatically
-          place an order or send an AI reply to a customer.
-        </p>
-        <p>
-          Store owners should avoid sending sensitive personal information in
-          chats unless it is needed to handle the order. AI-generated drafts can
-          be incomplete or incorrect and must be checked by the store.
-        </p>
-      </>
+      <p>
+        PasaOrder no longer offers customer chat, Messenger or Instagram
+        integrations, or AI-assisted chat order drafting. Conversation records
+        collected while those features were available may remain in storage
+        under the retention practices described below. They are not available
+        through the current app interface or API. Contact us to ask about a
+        specific record or request deletion where applicable.
+      </p>
     ),
   },
   {
@@ -97,11 +87,14 @@ const sections: LegalSection[] = [
           We share information only as needed to provide the service, at the
           store owner&apos;s direction, or as required by law. Service providers
           may process data for hosting, database operations, image storage and
-          delivery, authentication, AI-assisted review, and communications.
-          Facebook/Meta processes information when a store connects its Page;
-          Google processes conversation context when Gemini order extraction is
-          used. Those providers handle data under their own terms and privacy
-          notices.
+          delivery, and authentication. Historical records may reflect features
+          that are no longer available. Those providers handle data under their
+          own terms and privacy notices.
+        </p>
+        <p>
+          Historical order files and GCash payment proof images are stored
+          privately and can be opened by the owner of the store receiving that
+          order.
         </p>
         <p>
           A store owner controls the store&apos;s catalog and order workflow and
@@ -168,9 +161,9 @@ const sections: LegalSection[] = [
           creation.
         </p>
         <p>
-          Links and integrations to Meta, Google, and other services are subject
-          to those services&apos; own privacy practices. This policy does not
-          cover services we do not operate.
+          Links to Google and other services are subject to those services&apos;
+          own privacy practices. This policy does not cover services we do not
+          operate.
         </p>
       </>
     ),
@@ -191,7 +184,7 @@ export default function PrivacyPage() {
   return (
     <LegalDocument
       title="Privacy Policy"
-      summary="This policy explains how PasaOrder handles information when store owners manage a catalog and orders, and when customers place an order or message a store."
+      summary="This policy explains how PasaOrder handles information when store owners manage a catalog and orders, and when customers place an order."
       sections={sections}
     />
   );

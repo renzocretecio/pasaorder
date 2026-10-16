@@ -237,11 +237,6 @@
   flex: none;
 }
 .how,
-.chatSection {
-  max-width: 1440px;
-  margin: auto;
-  padding: clamp(76px, 8vw, 112px) clamp(22px, 4.5vw, 72px);
-}
 .sectionHeading {
   display: grid;
   grid-template-columns: 1.2fr 0.7fr;
@@ -360,50 +355,8 @@
   height: 18px;
   margin-top: 3px;
 }
-.chatIntro {
-  display: grid;
-  grid-template-columns: 1.1fr 0.7fr;
-  gap: 65px;
-  align-items: end;
-}
 .chatIntro h2 {
   max-width: 21ch;
-}
-.journey {
-  margin-top: 52px;
-  border: 1px solid var(--line);
-  border-radius: 24px;
-  overflow: hidden;
-  background: #fff;
-}
-.journeyControls {
-  padding: 20px 25px;
-  display: flex;
-  gap: 20px;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid var(--line);
-}
-.journeySteps {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.journeyStep {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  min-height: 44px;
-  padding: 9px 12px;
-  border: none;
-  border-radius: 8px;
-  color: var(--muted);
-  background: transparent;
-  font-size: 13px;
-  font-weight: 550;
-  transition:
-    background-color 0.2s,
-    color 0.2s;
 }
 .journeyStep span {
   display: grid;
@@ -439,18 +392,6 @@
 }
 .playButton:hover {
   background: var(--cream);
-}
-.journeyStage {
-  display: grid;
-  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-  min-height: 440px;
-}
-.journeyDescription {
-  min-width: 0;
-  padding: 50px 40px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
 }
 .exampleLabel {
   color: var(--muted);
@@ -527,14 +468,6 @@
 }
 .demoTopline strong {
   font-weight: 600;
-}
-.chatBubbles {
-  min-height: 240px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 24px 22px;
 }
 .chatBubbles p {
   max-width: 85%;
@@ -684,15 +617,6 @@
   .heroCopy h1 {
     font-size: clamp(44px, 5.5vw, 64px);
   }
-  .journeyControls {
-    align-items: flex-start;
-  }
-  .journeyStage {
-    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
-  }
-  .journeyDescription {
-    padding: 35px 25px;
-  }
   .demoViewport {
     padding: 24px;
   }
@@ -719,14 +643,7 @@
     height: 400px;
   }
   .how,
-  .chatSection {
-    padding-block: 85px;
-  }
   .sectionHeading,
-  .chatIntro {
-    grid-template-columns: 1fr;
-    gap: 24px;
-  }
   .steps {
     gap: 25px;
   }
@@ -748,18 +665,8 @@
   .menuCopy h2 {
     font-size: 40px;
   }
-  .journeyControls {
-    flex-direction: column;
-    align-items: stretch;
-  }
   .playButton {
     align-self: flex-start;
-  }
-  .journeyStage {
-    grid-template-columns: 1fr;
-  }
-  .journeyDescription {
-    padding: 30px;
   }
   .journeyDescription h3 {
     margin-top: 16px;
@@ -848,22 +755,6 @@
   .menuCopy {
     padding: 40px 0 0;
   }
-  .journey {
-    margin-top: 35px;
-    border-radius: 17px;
-  }
-  .journeyControls {
-    padding: 16px;
-  }
-  .journeySteps {
-    flex-direction: column;
-  }
-  .journeyStep {
-    text-align: left;
-  }
-  .journeyDescription {
-    padding: 25px 20px;
-  }
   .journeyDescription h3 {
     font-size: 30px;
   }
@@ -871,12 +762,6 @@
     padding: 18px 12px;
   }
   .demoTopline,
-  .chatBubbles,
-  .demoBottom,
-  .draftBody {
-    padding-left: 16px;
-    padding-right: 16px;
-  }
   .chatBubbles p {
     max-width: 95%;
   }

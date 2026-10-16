@@ -8,36 +8,33 @@ web
 
 ## Users
 
-- Store owners and staff who maintain a menu or catalog, receive orders, and track their progress. The initial audience is any store with a menu or catalog, rather than one food-service niche.
-- Customers who open a store's menu from a QR code or shared link and place an order in a mobile browser.
-- Store owners who review customer chat conversations and use ThinkLess inbox sorting and Gemini extraction to prepare order drafts. Facebook Messenger Page and linked Instagram professional account connections deliver incoming text messages, look up the customer's profile name when Meta makes it available, and let owners reply from PasaOrder.
-- Customers testing the public store chat can enter a name and send messages that appear as an owner-reviewed draft. Replies from the public test chat and automatic AI replies are not available yet.
+- Store owners and staff who maintain a digital catalog, receive orders, and track their progress. The initial audience is any small business, rather than one food-service niche.
+- Customers who open a store's product catalog from a QR code or shared link and place an order in a mobile browser.
 
 ## Product Purpose
 
-PasaOrder helps a store publish a menu, receive customer orders, and manage them in one place. A successful core journey is: a store publishes its menu and QR/link, a customer opens the menu and orders, and the store sees and handles that order. The first release is intended to support pickup, delivery, and dine-in orders.
+PasaOrder helps small businesses publish a product catalog, receive customer orders, and manage fulfillment in one place. A successful core journey is: an owner sets up a storefront, adds products or services, and shares its link or QR code; a customer chooses options, leaves an optional order note, and checks out; the owner reviews and manages the order. The flow should work for food, retail, gifts, and services without separate industry-specific apps.
 
 ## Positioning
 
-The product connects a store's public QR/link ordering flow with its order workspace. Owners can review public test chat, Facebook Messenger, and Instagram conversations in an inbox organized by the current conversation state, use ThinkLess to sort conversations and Gemini to extract orders during review, reply to connected Meta messaging customers, review an editable order draft against the store catalog, and confirm it into the same order queue.
+The product connects a store's public QR/link ordering flow with its order workspace. Customers order from the published catalog; owners review incoming orders, enter in-person orders, and manage fulfillment in one queue. Product variants and priced extras capture selectable product choices. Optional instructions belong in order notes. Chat ordering, social messaging, AI features, custom checkout questions, and configurable workflow builders are out of the current MVP scope.
 
 ## Operating Context
 
-- Store users create and update catalog items, share a stable menu link or QR code, review incoming orders, and update order status.
+- Store users create and update catalog items, share a stable storefront link or QR code, review incoming orders, and update order status.
 - Store owners can enter walk-in, phone, or in-store orders from the Orders workspace. When the orders page and catalog are already open, an order can be saved on the same device while offline and synced after reconnection. The API rechecks item availability and captured prices before creating it; stale orders stay queued for owner review without holding up other orders. Owners can review current prices, accept a change, or replace unavailable items before resubmitting. Lost responses retain the same request key for a safe retry. Saved orders have visible receipts, timestamps, item summaries, and confirmed discard actions; the entry form resets after a successful local save.
 - Customers can copy GCash payment details or download the store's GCash QR code when choosing that payment method. Payment confirmation is a separate step from placing or fulfilling an order.
-- Chat ordering must resolve requested items against the store's actual catalog; the model does not set authoritative prices or availability.
 
 ## Capabilities and Constraints
 
-- Owner authentication supports email/password and optional Google sign-in, plus store setup, contact phone, address, weekly operating hours, store banners, configurable dine-in/to-go/delivery options, category and item editing, XLSX product import with preview, optional size/piece variants with individual prices, image uploads, availability, accent customization, private preview, catalog publishing, public menu links, and downloadable menu QR codes exist. Guest checkout and a basic owner order queue with status updates exist. Stores can enable Cash and/or GCash, add copyable GCash account details and an optional QR image, and customers choose a method at checkout. Orders snapshot GCash instructions and track payment status independently; owners manually mark payment paid or unpaid. For delivery, the store sets the fee per order when confirming it. Facebook Messenger supports per-store Page connections, verified inbound text webhooks, best-effort customer profile name lookup, and owner-initiated text replies through Meta. Instagram supports per-store connections to a professional account linked to a Facebook Page, inbound text webhooks, best-effort customer username lookup, and owner-initiated replies. Automatic payment confirmation and payment gateways remain planned.
+- Owner authentication supports email/password and optional Google sign-in, with one owner able to switch between stores. Store setup includes business type, contact details, business hours, storefront appearance, and pickup, delivery, or dine-in settings. Owners manage categories, products or services, images, prices, availability, product options, and priced extras; they can preview and publish a catalog and share its link or QR code. XLSX product import is available. Guest checkout and an owner order queue with manual order entry and status updates are available. Stores can enable Cash and/or GCash; owners manually verify payment. For delivery, the store sets the fee per order when confirming it. Payment gateways and customer payment-proof upload remain planned.
+- Store order status follows a simple standard progression. Owners can accept or cancel orders and update their status; complex workflow customization is not part of the MVP.
 - Store logos, banners, and product images can be uploaded to Cloudflare R2 or supplied by public HTTPS URL. Uploaded images are normalized to WebP and served through the app; custom modifiers remain planned. Drafts and inactive stores are not public; publishing requires an available item. Saved edits to published catalogs go live immediately. Making the last item unavailable unpublishes the catalog.
 - Each store belongs directly to an owner, with categories, products, and orders attached to stores.
-- Public menu ordering is intended to work without requiring a customer account.
+- Public catalog ordering works without requiring a customer account.
 - Pickup, delivery, and dine-in are the selected first-release order types.
 - GCash copyable details and an optional downloadable QR are manual payment instructions. Store owners verify payment from their GCash account and update the order; automatic payment confirmation or a payment gateway has not been decided.
-- The owner chat inbox shows All, Possible order, and Needs attention. ThinkLess sorts the conversation into these three buckets; greetings and product, store, or payment questions enter Needs attention because the owner may need to reply. Simple thanks and acknowledgements remain in All. Obvious new orders enter Possible order, while ambiguity, complaints, and possible changes to active orders stay in Needs attention. The workspace Chats badge counts open conversations in Possible order and Needs attention for the selected store; it is not an unread-message count. Opening a Possible order starts Gemini review automatically. Only items Gemini marks as ordered and the API uniquely matches to available catalog products enter the editable form; tentative and ambiguous items remain for owner review. The owner can explicitly retry extraction for a Needs attention chat. PasaOrder sends chat text only to the private classifier and, during review, to Google when Gemini is configured. Provider failure leaves manual review usable. Confirmation re-reads availability and prices from the database and closes the chat draft. Automatic AI replies and post-order follow-ups remain planned.
-- A public `/chat/[store-slug]` test route asks for a customer name, then stores customer messages as a Web chat draft in the same review workflow. The customer can resume in the same browser tab while the draft remains open. It does not send a store reply or create an order automatically. Owner chat views update as new messages arrive, and confirmation rejects a stale transcript.
+- Customer chat ordering and Messenger/Instagram integrations are paused. Their API routes and product surfaces are disabled; historical chat and integration records are retained in the database and are not available through the current app.
 - Customer research, subscription terms, and pricing have not been established.
 
 ## Brand Commitments
@@ -53,7 +50,7 @@ The product connects a store's public QR/link ordering flow with its order works
 
 ## Product Principles
 
-1. Keep menu and future chat orders in one trackable order workflow.
+1. Keep catalog and manually entered orders in one trackable order workflow.
 2. Make the public ordering path straightforward on a customer's phone.
 3. Let store users control catalog truth, order confirmation, and payment verification.
-4. Keep AI output reviewable before it affects a real order.
+4. Keep order details and pricing under the store owner's control.

@@ -7,7 +7,6 @@ import { io } from "socket.io-client";
 import {
   ChevronDown,
   LayoutDashboard,
-  MessageSquareText,
   Plus,
   ShoppingBag,
   Store,
@@ -34,14 +33,12 @@ export function WorkspaceNavigation({
   const [pending, startTransition] = useTransition();
   const creating = pathname === "/dashboard/new";
   const orders = pathname.endsWith("/orders");
-  const chatOrders = pathname.includes("/chat-orders");
   const overview = pathname.endsWith("/overview");
   const routeStoreId = pathname.match(/^\/dashboard\/stores\/([^/]+)/)?.[1];
   const selectedStore =
     stores.find((store) => store.id === routeStoreId) ??
     stores.find((store) => store.isDefault);
   const selectedStoreId = selectedStore?.id;
-  const actionableChatCount = selectedStore?.actionableChatCount ?? 0;
   const catalogHref = selectedStore
     ? `/dashboard/stores/${selectedStore.id}`
     : "/dashboard";
@@ -103,13 +100,6 @@ export function WorkspaceNavigation({
         },
       );
     });
-    socket.on("chats:changed", (event: { storeId?: string }) => {
-      if (
-        event.storeId === selectedStoreId &&
-        document.visibilityState === "visible"
-      )
-        router.refresh();
-    });
     socket.on("orders:changed", (event: { storeId?: string }) => {
       if (
         overview &&
@@ -155,12 +145,7 @@ export function WorkspaceNavigation({
       href: catalogHref,
       label: "Catalog",
       icon: Store,
-      active:
-        Boolean(selectedStore) &&
-        !creating &&
-        !orders &&
-        !chatOrders &&
-        !overview,
+      active: Boolean(selectedStore) && !creating && !orders && !overview,
       count: 0,
     },
     {
@@ -169,13 +154,6 @@ export function WorkspaceNavigation({
       icon: ShoppingBag,
       active: Boolean(selectedStore) && orders,
       count: 0,
-    },
-    {
-      href: selectedStore ? `${catalogHref}/chat-orders` : "/dashboard",
-      label: "Chats",
-      icon: MessageSquareText,
-      active: Boolean(selectedStore) && chatOrders,
-      count: actionableChatCount,
     },
   ];
 
@@ -362,7 +340,7 @@ export function WorkspaceNavigation({
       </header>
       <nav
         aria-label="Store workspace"
-        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t bg-card pt-2 pl-[max(.5rem,env(safe-area-inset-left))] pr-[max(.5rem,env(safe-area-inset-right))] pb-[max(.5rem,env(safe-area-inset-bottom))] md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-3 border-t bg-card pt-2 pl-[max(.5rem,env(safe-area-inset-left))] pr-[max(.5rem,env(safe-area-inset-right))] pb-[max(.5rem,env(safe-area-inset-bottom))] md:hidden"
       >
         {links.map(({ href, label, icon: Icon, active, count }) => (
           <Link

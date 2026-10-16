@@ -11,10 +11,10 @@ export function ShareMenu({ slug }: { slug: string }) {
   async function copy() {
     try {
       await navigator.clipboard.writeText(url());
-      setMessage("Menu link copied.");
+      setMessage("Storefront link copied.");
     } catch {
       setMessage(
-        "Copy is unavailable. Open your menu and copy the link from the address bar.",
+        "Copy is unavailable. Open your catalog and copy the link from the address bar.",
       );
     }
   }
@@ -29,7 +29,7 @@ export function ShareMenu({ slug }: { slug: string }) {
       });
       const link = document.createElement("a");
       link.href = data;
-      link.download = `${slug}-menu-qr.png`;
+      link.download = `${slug}-catalog-qr.png`;
       link.click();
       setMessage("QR code downloaded.");
     } catch {
