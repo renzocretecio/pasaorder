@@ -297,7 +297,7 @@ export function MenuView({
         className={`${preview ? "scroll-mt-[var(--workspace-top)]" : "scroll-mt-0"} border-t-[5px] border-[var(--store-accent)]`}
       >
         <div
-          className={`mx-auto max-w-5xl px-5 pb-6 sm:px-8 sm:pb-8 ${preview ? "pt-6" : "pt-[calc(1.25rem+env(safe-area-inset-top))]"}`}
+          className={`mx-auto max-w-6xl px-4 pb-6 sm:px-8 sm:pb-8 ${preview ? "pt-6" : "pt-[calc(1.25rem+env(safe-area-inset-top))]"}`}
         >
           <div className="overflow-hidden rounded-2xl border border-[#d6dfd6] bg-white">
             <div className="h-36 bg-[var(--store-accent-soft)] sm:h-48">
@@ -410,7 +410,7 @@ export function MenuView({
           {addedMessage}
         </p>
       )}
-      <main className="mx-auto max-w-5xl px-5 py-9 sm:px-8 sm:py-12">
+      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-8 sm:py-12">
         {visible.length ? (
           <div className="space-y-12">
             {visible.map((category) => (
@@ -419,7 +419,7 @@ export function MenuView({
                 id={`category-${category.id}`}
                 className={preview ? "scroll-mt-44" : "scroll-mt-24"}
               >
-                <div className="mb-5 flex items-baseline gap-3">
+                <div className="mb-4 flex items-baseline gap-3 sm:mb-5">
                   <h2 className="break-words text-[18px] font-semibold leading-[1.3] tracking-[-0.01em]">
                     {category.name}
                   </h2>
@@ -434,17 +434,20 @@ export function MenuView({
                       type="button"
                       onClick={() => openProduct(item)}
                       disabled={!item.isAvailable}
-                      className="group flex min-h-32 w-full items-start gap-4 rounded-2xl border border-[#d6dfd6] bg-white p-4 text-left transition-colors hover:border-[var(--store-accent)] hover:bg-[#fcfdfb] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--store-accent-ink)] disabled:cursor-not-allowed disabled:opacity-65 sm:p-5"
+                      className="group flex min-h-32 w-full items-start gap-3 rounded-2xl border border-[#d6dfd6] bg-white p-3.5 text-left transition-[border-color,background-color,box-shadow] hover:border-[var(--store-accent)] hover:bg-[#fcfdfb] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--store-accent-ink)] disabled:cursor-not-allowed disabled:bg-[#f8f8f4] sm:gap-4 sm:p-5"
                     >
                       <CatalogImage
                         src={item.imageUrl}
                         alt=""
                         placeholderLabel="No photo"
-                        className="size-24 rounded-xl sm:size-28"
+                        className="size-20 rounded-xl sm:size-28"
                       />
                       <span className="flex min-w-0 flex-1 flex-col">
                         <span className="break-words text-base font-semibold">
                           {item.name}
+                        </span>
+                        <span className="mt-1 text-sm font-semibold tabular-nums text-[var(--store-accent-ink)]">
+                          {displayPrice(item)}
                         </span>
                         {item.productType !== "PHYSICAL" && (
                           <span className="mt-1 text-xs font-medium text-[#59685d]">
@@ -453,17 +456,14 @@ export function MenuView({
                               : "Service"}
                           </span>
                         )}
-                        <span className="mt-1 text-sm font-semibold tabular-nums text-[var(--store-accent-ink)]">
-                          {displayPrice(item)}
-                        </span>
                         {item.description && (
                           <span className="mt-2 line-clamp-2 break-words whitespace-pre-wrap text-sm leading-relaxed text-[#59685d]">
                             {item.description}
                           </span>
                         )}
                         {!item.isAvailable && (
-                          <span className="mt-2 text-[13px] font-medium text-[#59685d]">
-                            Currently unavailable
+                          <span className="mt-2 inline-flex w-fit rounded-full bg-[#f1f1eb] px-2.5 py-1 text-xs font-medium text-[#59685d]">
+                            Unavailable
                           </span>
                         )}
                       </span>
