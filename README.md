@@ -1,6 +1,6 @@
 # PasaOrder
 
-PasaOrder helps small businesses create a mobile-friendly storefront, receive customer orders, and manage fulfillment from one workspace. Product options, priced extras, and order notes support food, retail, gifts, and services. Customer chat ordering and Meta messaging are out of the current MVP.
+PasaOrder helps small businesses create a mobile-friendly storefront, receive customer orders, and manage fulfillment from one workspace. Product options, priced extras, and order notes support food, retail, gifts, and services. Customers order as guests from a shareable catalog; owners also record in-person or phone orders in the same queue. Chat ordering, Meta messaging, and AI features are outside the current MVP.
 
 See [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) for current features and architecture.
 
@@ -30,7 +30,7 @@ After signing in, create a store, add a category and available product or servic
 
 Image uploads use Cloudflare R2 through its S3-compatible API. Configure `R2_ENDPOINT`, `R2_BUCKET_NAME`, `R2_ACCESS_KEY_ID`, and `R2_SECRET_ACCESS_KEY` in `apps/api/.env`. New object paths are separated by API `NODE_ENV`; `IMAGE_PREFIX` can set a custom path. Uploaded images are normalized to WebP.
 
-Customers can order from the published catalog for pickup, delivery, or dine-in, choose product options, leave order notes, and use cash or the store's GCash instructions. Owners manage incoming orders and delivery fees in the order workspace. Manual order entry supports phone/in-person orders and offline queueing.
+Customers can order from the published catalog for pickup, delivery, or dine-in, choose product options, leave order notes, and use cash or the store's GCash instructions. A tracking link shows order progress. Customers can upload GCash payment proof for the store to review; owners confirm payment manually. Owners manage incoming orders and set delivery fees when confirming delivery orders. Manual order entry supports phone/in-person orders and offline queueing.
 
 To add sample orders to a local development store, run:
 

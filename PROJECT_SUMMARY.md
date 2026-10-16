@@ -1,12 +1,12 @@
 # PasaOrder project summary
 
-PasaOrder helps small businesses create a storefront, receive customer orders, and manage those orders from one workspace. Current positioning: “Orders made simple, from catalog to checkout.” It supports small businesses through product options, extras, and straightforward checkout. Customer chat ordering and Meta messaging integrations have been removed for now.
+PasaOrder helps small businesses create a storefront, receive customer orders, and manage those orders from one workspace. Current positioning: “Orders made simple, from catalog to checkout.” It supports product options, priced extras, guest checkout, and a shared order queue for catalog and manually entered orders. Customer chat ordering and Meta messaging are outside the current MVP.
 
 ## Product features
 
 ### Owner account and store workspace
 
-- Email and password registration/login, password reset, session management, and optional Google OAuth.
+- Email and password registration/login, session management, and optional Google OAuth. Password reset and email verification are not currently available.
 - One owner can manage multiple stores, select a default store, and switch between stores.
 - Store profile, contact details, today’s schedule, order types, payment methods, GCash account details/QR, accent color, logo, and banner.
 - Responsive owner workspace designed for mobile, tablet, and desktop.
@@ -22,9 +22,11 @@ PasaOrder helps small businesses create a storefront, receive customer orders, a
 
 ### Customer checkout and order operations
 
-- Customer ordering from a published catalog with pickup, delivery, and dine-in options, product add-ons, special instructions, and optional order notes.
+- Customer ordering from a published catalog with pickup, delivery, and dine-in options, product variants/add-ons, item instructions, and optional order notes.
 - Optional phone number, optional dine-in table number, special instructions, cash or GCash instructions, and delivery address.
 - Delivery fees are entered by the owner when confirming a delivery order.
+- Public order tracking lets customers check fulfillment and payment status using the order's private tracking link.
+- Customers can upload GCash payment proof; the owner reviews the image and marks payment status manually. PasaOrder does not process or settle the payment.
 - Order confirmation/tracking and an owner order dashboard with queue tabs, status changes, filtering, and paginated past orders.
 - A simple standard order progression with accept, cancel, and status updates.
 - Manual order entry is available for phone/in-person orders and supports offline queueing/sync.
@@ -38,7 +40,7 @@ PasaOrder helps small businesses create a storefront, receive customer orders, a
 
 ## Chat-to-order status
 
-Customer test chat, owner chat inbox, Messenger and Instagram connections/webhooks, ThinkLess classification, and Gemini order extraction have been removed from the app and API. No new chat conversations are accepted or processed. Existing chat-related database tables, migrations, and historical order-source labels are retained to preserve data and allow a future reimplementation. Historical conversation records may remain stored under the existing retention policy; the current UI and API do not expose them.
+Customer test chat, owner chat inbox, Messenger and Instagram connections/webhooks, ThinkLess classification, and Gemini order extraction have been removed from the app and API. No new chat conversations are accepted or processed. Existing chat-related database tables, migrations, and historical order-source labels remain for compatibility. Historical conversation records may remain stored under the retention practices described in the Privacy Policy; the current UI and API do not expose them.
 
 ## Architecture
 

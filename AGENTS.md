@@ -1,6 +1,6 @@
 # PasaOrder project instructions
 
-PasaOrder is a QR/link menu and catalog ordering app for store owners and customers. Read `apps/web/PRODUCT.md` for product scope and `DESIGN.md` for the current visual language before frontend work.
+PasaOrder is a QR/link storefront catalog and order management app for small-business owners and their customers. Read `apps/web/PRODUCT.md` for product scope and `DESIGN.md` for the current visual language before frontend work.
 
 ## Workspace
 

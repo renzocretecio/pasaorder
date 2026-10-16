@@ -1,6 +1,6 @@
 ---
 name: PasaOrder
-description: A warm, practical storefront identity paired with a premium operational workspace for menus, catalogs, ordering, and business management.
+description: A warm, practical storefront identity paired with a focused operational workspace for product catalogs, ordering, and business management.
 
 colors:
   primary: "#244d35"
@@ -151,7 +151,7 @@ rounded:
 
 PasaOrder combines a warm, approachable customer-facing identity with a focused operational workspace for store owners.
 
-The established authentication experience pairs warm cream with forest green and a soft lime accent. It should feel approachable, practical, and appropriate for businesses that manage menus, catalogs, and customer orders.
+The established authentication experience pairs warm cream with forest green and a soft lime accent. It should feel approachable, practical, and appropriate for businesses that manage product catalogs and customer orders.
 
 The business dashboard uses a light theme by default for now, with an operational layout. It should feel premium and focused without becoming futuristic, overly technical, or visually noisy.
 
@@ -203,11 +203,11 @@ Authentication is currently the most developed visual reference for PasaOrder's 
 
 **Status: Established**
 
-The public home page presents PasaOrder as an order management tool for small Filipino stores. Its headline is “Orders made simple, from chat to checkout.” The page uses the existing Geist typeface, forest green, soft lime, and warm neutral foundation. A warm light opening pairs a large left-aligned headline with compact supporting copy and actions. Wide neighborhood-store photography, a forest-green handoff strip, and a lime-backed interactive example give the page its identity. The primary action leads to account creation. A sticky header keeps sign-in reachable on mobile.
+The public home page presents PasaOrder as a storefront and order management tool for small businesses. Its headline is “Orders made simple, from catalog to checkout.” The page uses the existing Geist typeface, forest green, soft lime, and warm neutral foundation. A warm light opening pairs a large left-aligned headline with compact supporting copy and actions. Neighborhood-store photography, a forest-green catalog-to-order strip, a three-step explanation, and a QR ordering feature section give the page its identity. The primary action leads to account creation. A sticky header keeps sign-in reachable on mobile.
 
-The landing page’s focal motion is a visitor-controlled Messenger → owner review → confirmed order walkthrough. Its play sequence is finite, pauses offscreen, and stops when the document is hidden. Reduced-motion preferences remove spatial transitions and playback while preserving manual stage controls. Section reveals run once, retain visible HTML before JavaScript, and cancel when reduced motion is enabled. CTA arrows provide small directional feedback; avoid perpetual decorative loops.
+Motion is limited to a brief hero-photo entrance, one-time scroll reveals, and restrained CTA arrow feedback. Scroll reveals use the Web Animations API, run only when elements enter view, and are skipped when reduced motion is enabled. Keep the handoff strip and page content readable without motion; avoid perpetual decorative loops.
 
-Marketing copy must distinguish current QR/link checkout and owner-reviewed Facebook Messenger order drafts from planned capabilities. Demonstrations are explicitly illustrative; do not invent testimonials, metrics, prices, or automatic payment confirmation. Keep the page readable on phones and tablets, with the handoff path stacking vertically on narrow screens.
+Marketing copy should describe the current QR/link catalog, guest checkout, product options, order notes, owner order queue, and manual GCash verification. Do not imply chat ordering, Meta messaging, AI processing, automatic payment confirmation, or custom checkout questions. Do not invent testimonials, metrics, or prices. Keep the page readable on phones and tablets, with the handoff path stacking vertically on narrow screens.
 
 ## Business Dashboard
 
@@ -444,7 +444,7 @@ At 768px and above, replace the bottom navigation with an 88px rail. Show the fu
 
 The publish panel precedes catalog items on narrow screens and becomes a contextual side panel from 1024px. Sharing controls and the setup checklist use a disclosure to keep the main task in view. Published catalogs keep visibility controls inside the sharing section, while draft catalogs expose the publish action. Category/item actions stay reachable under the compact header while browsing.
 
-Chat order review stacks the conversation before order details on phones. From tablet width, use a 60/40 split with editable order details on the left and the conversation and review guidance on the right. Keep item controls readable within the narrower order column.
+Manual order entry stacks products and customer details on phones and uses a wider dialog on larger screens. Keep the item list, customer details, and save action clear in both online and offline states.
 
 Dashboard content should be information-dense without feeling crowded.
 
@@ -461,8 +461,6 @@ The storefront is mobile-first.
 Assume many customers arrive through:
 
 - QR codes.
-- Messenger links.
-- Instagram links.
 - Shared URLs.
 
 Design the primary experience for narrow screens first and progressively enhance larger screens.
@@ -721,7 +719,7 @@ The cart action floats at the bottom right with a visible item count. Respect de
 
 ## Storefront Product Presentation
 
-The menu opens with the complete store profile above category navigation and products. Its wide banner and overlapping square logo follow a familiar social profile composition. The banner is optional; an accent-tinted cover remains when none is set. Show the store name, full description, optional address and tap-to-call phone number, and weekly hours when configured. Display closed days and mark closing times after midnight as next day. Give the banner a restrained height on phones and keep the profile details easy to scan before the catalog.
+The catalog opens with the complete store profile above category navigation and products. Its wide banner and overlapping square logo follow a familiar social profile composition. The banner is optional; an accent-tinted cover remains when none is set. Show the store name, full description, optional address and tap-to-call phone number, and today's schedule when hours are configured. Show whether the store is open or closed and mark a closing time after midnight as next day. Do not repeat the full weekly schedule in the public profile. Give the banner a restrained height on phones and keep the profile details easy to scan before the catalog.
 
 Prioritize:
 
@@ -763,7 +761,7 @@ Avoid unrelated navigation or promotional content.
 Clearly separate:
 
 - Customer information.
-- Pickup or delivery.
+- Pickup, delivery, or dine-in when enabled for the store.
 - Payment method.
 - Order summary.
 - Final order action.
@@ -799,7 +797,7 @@ Examples:
 - Which orders are ready?
 - What requires action now?
 
-AI features should feel integrated into existing workflows rather than appearing as a separate chatbot product.
+If AI features are reintroduced in a future release, they should support an existing workflow rather than appear as a separate chatbot product.
 
 # Orders
 
@@ -825,32 +823,6 @@ Do not make owners navigate through unnecessary layers to perform common order a
 Use semantic status treatment consistently.
 
 New, preparing, ready, completed, and cancelled orders must remain distinguishable without relying only on color.
-
-# AI Order Manager
-
-AI is a supporting capability, not the visual identity of PasaOrder.
-
-Do not introduce:
-
-- Purple AI gradients.
-- Sparkling backgrounds.
-- Neon glows.
-- Futuristic AI illustrations.
-- Excessive "magic" iconography.
-
-AI-assisted orders should visually belong to the normal order workflow.
-
-Clearly distinguish:
-
-- Original customer message.
-- AI interpretation.
-- Extracted order draft.
-- Missing or uncertain information.
-- Owner confirmation.
-
-AI output should never visually imply certainty when clarification is required.
-
-The owner should remain in control of creating or confirming an order.
 
 # Responsive Behavior
 
