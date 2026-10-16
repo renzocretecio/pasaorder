@@ -44,11 +44,14 @@ const sections: LegalSection[] = [
     title: "What PasaOrder provides",
     content: (
       <p>
-        PasaOrder gives store owners tools to publish catalogs, receive customer
-        orders, and manage their order queue. Customers may use a public store
-        link or QR code to view a catalog and submit an order. Features may
-        change as the service develops. Some integrations require separate
-        accounts, permissions, or approval from third-party providers.
+        PasaOrder gives store owners tools to publish a catalog, manage products
+        and options, receive customer orders, and manage an order queue.
+        Customers may use a public store link or QR code to browse and place an
+        order without creating an account. Depending on the store, checkout may
+        include pickup, delivery, or dine-in, customer contact details, and an
+        optional order note. Store owners can also enter orders manually; an
+        unsynced manual order may be saved in the owner&apos;s browser until it
+        can be sent to the service. Features may change as the service develops.
       </p>
     ),
   },
@@ -60,8 +63,9 @@ const sections: LegalSection[] = [
           Keep account credentials secure and account information accurate.
         </li>
         <li>
-          Use only content, images, customer information, and Page connections
-          that you are authorized to provide.
+          Use only content, images, and customer information that you are
+          authorized to provide, and use customer information only as allowed by
+          applicable law and your own customer notices.
         </li>
         <li>
           Keep catalog descriptions, prices, availability, operating details,
@@ -70,7 +74,8 @@ const sections: LegalSection[] = [
         <li>
           Review orders before confirming them, and handle customer requests,
           payment verification, fulfillment, refunds, and required notices for
-          your business.
+          your business. You are responsible for protecting customer details
+          saved in a browser you use to enter orders.
         </li>
         <li>
           Follow applicable laws and the terms of Google and any payment
@@ -89,8 +94,10 @@ const sections: LegalSection[] = [
         determine final availability, or guarantee that a store will fulfill an
         order. Where a store provides GCash or other payment instructions,
         customers pay the store directly and the store verifies payment.
-        PasaOrder currently does not represent that it processes or settles
-        those payments.
+        PasaOrder does not process or settle those payments. Customers may
+        upload payment proof for the store to review. An upload does not confirm
+        that a payment was made or verified; the store owner must check and
+        confirm it separately.
       </p>
     ),
   },
@@ -100,10 +107,9 @@ const sections: LegalSection[] = [
       <p>
         Do not use PasaOrder to break the law, infringe another person&apos;s
         rights, send spam, interfere with the service, attempt unauthorized
-        access, upload malicious code, or misuse another person&apos;s account,
-        Page, or personal information. We may investigate suspected abuse and
-        restrict access when reasonably necessary to protect users or the
-        service.
+        access, upload malicious code, or misuse another person&apos;s account
+        or personal information. We may investigate suspected abuse and restrict
+        access when reasonably necessary to protect users or the service.
       </p>
     ),
   },
@@ -164,7 +170,12 @@ const sections: LegalSection[] = [
     content: (
       <p>
         Questions about these Terms may be sent to{" "}
-        <strong>[PasaOrder contact email]</strong>.
+        <a
+          className="font-medium text-[#244d35] underline underline-offset-4"
+          href="mailto:renzocretecio@gmail.com"
+        >
+          renzocretecio@gmail.com
+        </a>
       </p>
     ),
   },

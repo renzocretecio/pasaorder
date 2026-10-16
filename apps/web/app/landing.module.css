@@ -114,7 +114,7 @@
 .primaryCta:hover {
   background: var(--green);
 }
-:is(.headerCta, .primaryCta, .closeCta, .heroTextLink, .nextStage) svg {
+:is(.headerCta, .primaryCta, .closeCta, .heroTextLink) svg {
   transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 :is(.headerCta, .primaryCta, .closeCta):hover svg {
@@ -176,8 +176,7 @@
 .heroTextLink:hover {
   text-decoration: underline;
 }
-.heroTextLink:hover svg,
-.nextStage:hover svg {
+.heroTextLink:hover svg {
   transform: translateX(4px);
 }
 .heroFootnote {
@@ -236,16 +235,19 @@
   width: 23px;
   flex: none;
 }
-.how,
+.how {
+  max-width: 1440px;
+  margin: auto;
+  padding: clamp(76px, 9vw, 128px) clamp(22px, 4.5vw, 72px);
+}
 .sectionHeading {
   display: grid;
-  grid-template-columns: 1.2fr 0.7fr;
+  grid-template-columns: minmax(0, 1.2fr) minmax(18rem, 0.7fr);
   align-items: end;
   gap: 70px;
 }
 .sectionHeading h2,
 .menuCopy h2,
-.chatIntro h2,
 .close h2 {
   margin: 0;
   color: var(--forest);
@@ -259,8 +261,7 @@
   max-width: 17ch;
 }
 .sectionHeading p,
-.menuCopy > p,
-.chatIntro > p {
+.menuCopy > p {
   margin: 0;
   color: var(--muted);
   font-size: 17px;
@@ -301,7 +302,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   max-width: 1440px;
-  padding: 0 clamp(22px, 4.5vw, 72px);
+  padding: clamp(60px, 8vw, 110px) clamp(22px, 4.5vw, 72px);
   margin: auto;
   gap: clamp(40px, 7vw, 112px);
   align-items: center;
@@ -354,185 +355,6 @@
   width: 18px;
   height: 18px;
   margin-top: 3px;
-}
-.chatIntro h2 {
-  max-width: 21ch;
-}
-.journeyStep span {
-  display: grid;
-  place-items: center;
-  width: 23px;
-  height: 23px;
-  flex: none;
-  border: 1px solid currentColor;
-  border-radius: 50%;
-  font-variant-numeric: tabular-nums;
-}
-.journeyStep[aria-pressed="true"] {
-  background: var(--forest);
-  color: #fff;
-}
-.journeyStep:hover:not([aria-pressed="true"]) {
-  background: var(--cream);
-  color: var(--forest);
-}
-.playButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 10px 12px;
-  flex: none;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  color: var(--forest);
-  background: #fff;
-  font-size: 13px;
-}
-.playButton:hover {
-  background: var(--cream);
-}
-.exampleLabel {
-  color: var(--muted);
-  font-size: 13px;
-}
-.journeyDescription h3 {
-  margin: 30px 0 17px;
-  font-size: 34px;
-  font-weight: 600;
-  letter-spacing: -0.03em;
-  line-height: 1.15;
-}
-.journeyDescription p {
-  margin: 0;
-  max-width: 34ch;
-  color: var(--muted);
-  font-size: 16px;
-  line-height: 1.65;
-}
-.nextStage {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: auto;
-  padding: 25px 0 0;
-  min-height: 44px;
-  border: none;
-  background: transparent;
-  color: var(--green);
-  font-size: 14px;
-  font-weight: 600;
-  text-align: left;
-}
-.descriptionStates,
-.demoBody {
-  display: grid;
-}
-.descriptionStates > div,
-.demoBody > div {
-  grid-area: 1 / 1;
-}
-.descriptionStates > [aria-hidden="true"],
-.demoBody > [aria-hidden="true"] {
-  visibility: hidden;
-}
-.demoViewport {
-  display: grid;
-  align-items: center;
-  padding: 36px;
-  background: var(--lime);
-  overflow: hidden;
-}
-.demoPaper {
-  width: 100%;
-  min-width: 0;
-  background: #fff;
-  border-radius: 14px;
-  overflow: hidden;
-  box-shadow: 0 15px 35px rgb(23 61 44 / 12%);
-}
-.demoTopline {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 64px;
-  padding: 20px 22px;
-  border-bottom: 1px solid var(--line);
-  color: var(--forest);
-  font-size: 14px;
-}
-.demoTopline svg {
-  flex: none;
-}
-.demoTopline strong {
-  font-weight: 600;
-}
-.chatBubbles p {
-  max-width: 85%;
-  margin: 0;
-  padding: 12px 15px;
-  border-radius: 13px;
-  font-size: 14px;
-  line-height: 1.5;
-}
-.customerBubble {
-  background: var(--cream);
-  color: var(--forest);
-}
-.storeBubble {
-  align-self: flex-end;
-  background: var(--green);
-  color: #fff;
-}
-.draftBody {
-  min-height: 240px;
-  padding: 15px 22px;
-}
-.draftRow,
-.draftFulfillment {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 14px 0;
-  font-size: 15px;
-}
-.draftRow + .draftRow,
-.draftFulfillment {
-  border-top: 1px solid var(--line);
-}
-.draftRow strong,
-.draftFulfillment strong {
-  font-weight: 600;
-}
-.draftFulfillment {
-  color: var(--muted);
-  font-size: 13px;
-}
-.draftReview {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 11px 0;
-  color: var(--green);
-  font-size: 13px;
-}
-.draftReview svg {
-  flex: none;
-}
-.demoBottom {
-  min-height: 50px;
-  padding: 14px 22px;
-  border-top: 1px solid var(--line);
-  color: var(--green);
-  font-size: 13px;
-  font-weight: 550;
-}
-.exampleNote {
-  color: var(--muted);
-  font-size: 13px;
-  margin: 15px 0 0;
 }
 .close {
   background: var(--forest);
@@ -617,9 +439,6 @@
   .heroCopy h1 {
     font-size: clamp(44px, 5.5vw, 64px);
   }
-  .demoViewport {
-    padding: 24px;
-  }
 }
 @media (max-width: 800px) {
   .headerInner {
@@ -642,9 +461,12 @@
   .heroImage {
     height: 400px;
   }
-  .how,
   .sectionHeading,
   .steps {
+    gap: 25px;
+  }
+  .sectionHeading {
+    grid-template-columns: 1fr;
     gap: 25px;
   }
   .step h3 {
@@ -664,18 +486,6 @@
   }
   .menuCopy h2 {
     font-size: 40px;
-  }
-  .playButton {
-    align-self: flex-start;
-  }
-  .journeyDescription h3 {
-    margin-top: 16px;
-  }
-  .journeyDescription p {
-    max-width: 50ch;
-  }
-  .demoViewport {
-    padding: 30px;
   }
   .closeInner {
     align-items: flex-start;
@@ -754,16 +564,6 @@
   }
   .menuCopy {
     padding: 40px 0 0;
-  }
-  .journeyDescription h3 {
-    font-size: 30px;
-  }
-  .demoViewport {
-    padding: 18px 12px;
-  }
-  .demoTopline,
-  .chatBubbles p {
-    max-width: 95%;
   }
   .footerInner {
     flex-direction: column;

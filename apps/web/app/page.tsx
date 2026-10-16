@@ -9,7 +9,7 @@ import { LandingMotion } from "@/features/landing/landing-motion";
 export const metadata: Metadata = {
   title: "PasaOrder | Orders made simple, from catalog to checkout",
   description:
-    "Share a simple online catalog, collect customer choices, and manage every order in one workspace built for small businesses.",
+    "Share an online catalog, let customers order without an account, and manage orders from one workspace built for small businesses.",
   alternates: { canonical: "/" },
   openGraph: {
     type: "website",
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     siteName: "PasaOrder",
     title: "Orders made simple, from catalog to checkout | PasaOrder",
     description:
-      "Share a simple online catalog, collect customer choices, and manage every order in one workspace built for small businesses.",
+      "Share an online catalog, let customers order without an account, and manage orders from one workspace built for small businesses.",
     url: "/",
     images: [
       {
@@ -32,7 +32,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Orders made simple, from catalog to checkout | PasaOrder",
     description:
-      "Share a simple online catalog, collect customer choices, and manage every order in one workspace built for small businesses.",
+      "Share an online catalog, let customers order without an account, and manage orders from one workspace built for small businesses.",
     images: ["/images/landing/merchant-counter.webp"],
   },
 };
@@ -46,7 +46,7 @@ const steps = [
   {
     title: "Let customers order their way.",
     description:
-      "Customers choose product options, answer the details you need, and place an order for pickup, delivery, or dine-in.",
+      "Customers choose available options, add an optional order note, and check out as a guest for pickup, delivery, or dine-in.",
   },
   {
     title: "Keep every order moving.",
@@ -94,8 +94,8 @@ export default function Home() {
                 <div className={s.heroSupport}>
                   <p>
                     Give customers an easy way to order from your business.
-                    Share a catalog, collect the choices and details you need,
-                    and manage every order in one simple workspace.
+                    Share a catalog, let them choose product options and add a
+                    note, then manage orders in one simple workspace.
                   </p>
                   <div className={s.heroActions}>
                     <Link href="/register" className={s.primaryCta}>
@@ -108,7 +108,8 @@ export default function Home() {
                     </a>
                   </div>
                   <span className={s.heroFootnote}>
-                    Made for independent shops, sellers, and local businesses.
+                    No customer account required. Made for independent shops,
+                    sellers, and local businesses.
                   </span>
                 </div>
               </div>

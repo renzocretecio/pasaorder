@@ -36,18 +36,23 @@ const sections: LegalSection[] = [
           Depending on how you use PasaOrder, information may include account
           name and email, authentication identifiers, store name and settings,
           catalog text and images, customer names and contact details, delivery
-          addresses, table numbers, order contents, and payment status. Some
-          historical orders may also include files that customers sent while
-          custom upload fields were available. Customers may also upload GCash
-          payment proof images for an order; these images are private and are
-          made available to the store owner for manual verification. PasaOrder
-          currently supports ordering through a store catalog or link and manual
-          order entry by the store owner.
+          addresses, table numbers for applicable stores, order contents and
+          notes, and payment status. Customers can upload a GCash payment proof
+          image for an order; it is stored privately and made available to the
+          receiving store owner for manual review. Some historical orders may
+          include files uploaded through custom fields that are no longer
+          offered. Store owners can enter orders manually, including while
+          offline; unsynced orders are temporarily kept in that browser&apos;s
+          local storage until they sync or are removed.
         </p>
         <p>
           We also receive technical information needed to operate and protect
-          the service, such as request, device, and diagnostic data. PasaOrder
-          does not currently connect to Facebook or Instagram messaging.
+          the service, such as request, device, and diagnostic data. Customers
+          may place catalog orders without creating an account. Their cart
+          product and option selections and item instructions are saved in
+          browser storage for up to seven days; customer contact and delivery
+          details are not saved in that cart. PasaOrder does not currently
+          connect to Facebook or Instagram messaging.
         </p>
       </>
     ),
@@ -110,11 +115,15 @@ const sections: LegalSection[] = [
     content: (
       <p>
         We use technical and organizational safeguards intended to protect
-        information, but no online service can promise absolute security. We
-        keep information while it is needed to operate the account, fulfill and
-        document orders, meet legal obligations, resolve disputes, and enforce
-        our agreements. Retention periods vary by record type. When information
-        is no longer needed, we intend to delete or de-identify it where
+        information, but no online service can promise absolute security. The
+        customer cart is removed from browser storage after seven days. An
+        owner&apos;s unsynced manual orders remain in that browser until they
+        sync or the owner removes them; anyone with access to that browser
+        profile may be able to access them. Server-side account and order
+        records are retained while needed to provide the service, handle orders,
+        meet legal obligations, resolve disputes, and enforce agreements. The
+        applicable period depends on the record and purpose. When information is
+        no longer needed, we intend to delete or de-identify it where
         practicable, subject to legal and operational requirements.
       </p>
     ),
@@ -174,7 +183,13 @@ const sections: LegalSection[] = [
       <p>
         We may update this policy as PasaOrder changes. We will revise the date
         above when we publish a new version. Questions or requests can be sent
-        to <strong>renzocretecio@gmail.com</strong>.
+        to{" "}
+        <a
+          className="font-medium text-[#244d35] underline underline-offset-4"
+          href="mailto:renzocretecio@gmail.com"
+        >
+          renzocretecio@gmail.com
+        </a>
       </p>
     ),
   },
