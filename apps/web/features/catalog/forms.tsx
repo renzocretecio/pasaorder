@@ -36,6 +36,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { orderTypeLabel } from "./order-type-label";
 function useCatalogAction() {
   const result = useActionState<CatalogState, FormData>(catalogAction, {});
   const formRef = useRef<HTMLFormElement>(null);
@@ -410,12 +411,7 @@ export function StoreForm({ store }: { store?: CatalogStore }) {
           <div className="flex flex-wrap gap-2">
             {orderTypesByBusinessCategory[businessCategory].map((orderType) => {
               const selected = selectedOrderTypes.includes(orderType);
-              const label =
-                orderType === "DINE_IN"
-                  ? "Dine in"
-                  : orderType === "PICKUP"
-                    ? "Takeaway"
-                    : "Delivery";
+              const label = orderTypeLabel(orderType, businessCategory);
               return (
                 <label
                   key={orderType}

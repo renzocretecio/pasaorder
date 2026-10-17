@@ -308,7 +308,7 @@ export function createManualOrder(
 
 export async function getPublicOrder(trackingToken: string) {
   const result = await pool.query(
-    `SELECT o.id, o.store_id AS "storeId", s.name AS "storeName", s.slug AS "storeSlug", s.order_workflow AS "orderWorkflow", o.status, o.order_type AS "orderType", o.table_number AS "tableNumber", o.scheduled_for AS "scheduledFor", o.payment_method AS "paymentMethod", o.payment_status AS "paymentStatus", o.payment_instructions AS "paymentInstructions", o.form_answers AS "formAnswers", COALESCE((SELECT SUM(oi.subtotal) FROM order_items oi WHERE oi.order_id = o.id), 0)::text AS "itemsSubtotal", o.total, o.delivery_fee AS "deliveryFee", o.created_at AS "createdAt" FROM orders o JOIN stores s ON s.id = o.store_id WHERE o.tracking_token = $1`,
+    `SELECT o.id, o.store_id AS "storeId", s.name AS "storeName", s.slug AS "storeSlug", s.business_category AS "businessCategory", s.order_workflow AS "orderWorkflow", o.status, o.order_type AS "orderType", o.table_number AS "tableNumber", o.scheduled_for AS "scheduledFor", o.payment_method AS "paymentMethod", o.payment_status AS "paymentStatus", o.payment_instructions AS "paymentInstructions", o.form_answers AS "formAnswers", COALESCE((SELECT SUM(oi.subtotal) FROM order_items oi WHERE oi.order_id = o.id), 0)::text AS "itemsSubtotal", o.total, o.delivery_fee AS "deliveryFee", o.created_at AS "createdAt" FROM orders o JOIN stores s ON s.id = o.store_id WHERE o.tracking_token = $1`,
     [trackingToken],
   );
   if (!result.rows[0]) throw new AppError(404, "Order not found");

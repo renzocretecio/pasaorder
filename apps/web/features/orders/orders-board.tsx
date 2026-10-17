@@ -6,8 +6,8 @@ import { io } from "socket.io-client";
 import { Dialog } from "radix-ui";
 import { Check, ChevronDown, LoaderCircle, RefreshCw, X } from "lucide-react";
 import type {
+  BusinessCategory,
   OrderStatus,
-  OrderType,
   OrderWorkflow,
   OwnerOrder,
   PastOrdersPage,
@@ -16,6 +16,7 @@ import type { Catalog } from "@pasaorder/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { peso } from "@/features/catalog/color";
+import { orderTypeLabel } from "@/features/catalog/order-type-label";
 import {
   loadPastOrdersPage,
   updateOrderPayment,
@@ -50,12 +51,6 @@ const statusStyle: Record<OrderStatus, string> = {
   READY: "border-emerald-200 bg-emerald-50 text-emerald-900",
   COMPLETED: "border-[#d6dfd6] bg-[#f1f3ef] text-[#59685d]",
   CANCELLED: "border-red-200 bg-red-50 text-red-800",
-};
-
-const orderTypeLabel: Record<OrderType, string> = {
-  DINE_IN: "Dine in",
-  PICKUP: "Takeaway",
-  DELIVERY: "Delivery",
 };
 
 const sourceLabel: Record<OwnerOrder["source"], string> = {
@@ -178,12 +173,14 @@ function PaymentProofDialog({
 
 function OrderRow({
   order,
+  businessCategory,
   workflow,
   nextActionLabel,
   initialOpen,
   onSuccess,
 }: {
   order: OwnerOrder;
+  businessCategory: BusinessCategory;
   workflow: OrderWorkflow;
   nextActionLabel?: string;
   initialOpen?: boolean;
@@ -638,7 +635,7 @@ function OrderRow({
             <span className="mx-1" aria-hidden="true">
               ·
             </span>
-            {orderTypeLabel[order.orderType]}
+            {orderTypeLabel(order.orderType, businessCategory)}
             {order.orderType === "DINE_IN" && order.tableNumber && (
               <>
                 <span className="mx-1" aria-hidden="true">
@@ -815,11 +812,13 @@ function PaymentFilterBar({
 
 function HistoryQueue({
   storeId,
+  businessCategory,
   workflow,
   initialPage,
   onSuccess,
 }: {
   storeId: string;
+  businessCategory: BusinessCategory;
   workflow: OrderWorkflow;
   initialPage: PastOrdersPage;
   onSuccess: (message: string) => void;
@@ -882,6 +881,7 @@ function HistoryQueue({
             <OrderRow
               key={order.id}
               order={order}
+              businessCategory={businessCategory}
               workflow={workflow}
               onSuccess={onSuccess}
             />
@@ -1127,6 +1127,7 @@ export function OrdersBoard({
         <HistoryQueue
           key={loadedAt}
           storeId={storeId}
+          businessCategory={catalog.store.businessCategory}
           workflow={workflow}
           initialPage={initialHistoryPage}
           onSuccess={setAnnouncement}
@@ -1153,6 +1154,7 @@ export function OrdersBoard({
                 <OrderRow
                   key={order.id}
                   order={order}
+                  businessCategory={catalog.store.businessCategory}
                   initialOpen={
                     order.status === "NEW" && order.id === initialOrderId
                   }
