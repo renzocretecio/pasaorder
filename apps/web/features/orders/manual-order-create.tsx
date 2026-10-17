@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { peso } from "@/features/catalog/color";
+import { orderTypeLabel } from "@/features/catalog/order-type-label";
 import { createManualOrder, loadManualOrderCatalog } from "./actions";
 import {
   captureManualOrder,
@@ -1143,11 +1144,10 @@ export function ManualOrderCreate({ catalog }: { catalog: Catalog }) {
                         )}
                         {store.orderTypes.map((type) => (
                           <option key={type} value={type}>
-                            {type === "DINE_IN"
-                              ? "Dine in"
-                              : type === "PICKUP"
-                                ? "Takeaway"
-                                : "Delivery"}
+                            {orderTypeLabel(
+                              type,
+                              catalog.store.businessCategory,
+                            )}
                           </option>
                         ))}
                       </select>

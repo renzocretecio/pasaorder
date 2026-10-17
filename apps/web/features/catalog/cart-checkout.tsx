@@ -12,6 +12,7 @@ import type {
   PaymentStatus,
 } from "@pasaorder/types";
 import { Button } from "@/components/ui/button";
+import { orderTypeLabel } from "./order-type-label";
 import { CatalogImage } from "./catalog-image";
 import { orderTypes } from "@pasaorder/types";
 import { peso } from "./color";
@@ -132,12 +133,6 @@ function GcashInstructions({
       )}
     </div>
   );
-}
-
-function orderTypeLabel(orderType: OrderType) {
-  if (orderType === "DINE_IN") return "Dine in";
-  if (orderType === "PICKUP") return "Takeaway";
-  return "Delivery";
 }
 
 function cents(value: string) {
@@ -372,7 +367,11 @@ export function CartCheckout({
               </Dialog.Title>
               <Dialog.Description className="mt-2 max-w-sm text-sm leading-relaxed text-[#59685d]">
                 Thanks, {name}. The store will review your{" "}
-                {orderTypeLabel(placedOrder.orderType).toLowerCase()} order
+                {orderTypeLabel(
+                  placedOrder.orderType,
+                  businessCategory,
+                ).toLowerCase()}{" "}
+                order
                 {placedOrder.orderType === "DINE_IN"
                   ? "."
                   : ` and contact you at ${phone}.`}
@@ -735,7 +734,9 @@ export function CartCheckout({
                             onChange={() => setOrderType(option)}
                             className="size-4 accent-[var(--store-accent-ink)]"
                           />
-                          <span>{orderTypeLabel(option)}</span>
+                          <span>
+                            {orderTypeLabel(option, businessCategory)}
+                          </span>
                         </label>
                       ))}
                   </div>

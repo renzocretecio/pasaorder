@@ -9,11 +9,13 @@ import type {
   PaymentStatus,
   OrderWorkflow,
   StoreOrderAnswer,
+  BusinessCategory,
 } from "@pasaorder/types";
 import { CopyPaymentDetails } from "@/features/catalog/copy-payment-details";
 import { PaymentProofUpload } from "@/features/orders/payment-proof-upload";
 import { CustomerReadyAlert } from "@/features/notifications/customer-ready-alert";
 import { CustomerOrderLiveUpdates } from "@/features/orders/customer-order-live-updates";
+import { orderTypeLabel } from "@/features/catalog/order-type-label";
 
 export const metadata: Metadata = {
   title: "Order status | PasaOrder",
@@ -24,6 +26,7 @@ type TrackedOrder = {
   id: string;
   storeName: string;
   storeSlug: string;
+  businessCategory: BusinessCategory;
   status:
     "NEW" | "CONFIRMED" | "PREPARING" | "READY" | "COMPLETED" | "CANCELLED";
   orderType: "DINE_IN" | "PICKUP" | "DELIVERY";
@@ -60,12 +63,6 @@ const defaultStatusLabels: Record<TrackedOrder["status"], string> = {
   CANCELLED: "Cancelled",
 };
 
-const orderTypeLabels: Record<TrackedOrder["orderType"], string> = {
-  DINE_IN: "Dine in",
-  PICKUP: "Takeaway",
-  DELIVERY: "Delivery",
-};
-
 export default async function OrderTrackingPage({
   params,
 }: {
@@ -99,7 +96,7 @@ export default async function OrderTrackingPage({
             {statusLabels[order.status]}
           </h1>
           <p className="mt-2 text-sm text-[#59685d]">
-            {orderTypeLabels[order.orderType]} · Placed{" "}
+            {orderTypeLabel(order.orderType, order.businessCategory)} · Placed{" "}
             {new Date(order.createdAt).toLocaleString("en-PH", {
               dateStyle: "medium",
               timeStyle: "short",
