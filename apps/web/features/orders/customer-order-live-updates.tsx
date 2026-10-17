@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { io } from "socket.io-client";
+import { getSocketUrl } from "@/lib/socket-url";
 
 export function CustomerOrderLiveUpdates({
   trackingToken,
@@ -13,17 +14,10 @@ export function CustomerOrderLiveUpdates({
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    const isLocalHost = ["localhost", "127.0.0.1"].includes(
-      window.location.hostname,
-    );
-    const socket = io(
-      process.env.NEXT_PUBLIC_SOCKET_URL ??
-        (isLocalHost ? "http://localhost:4000" : window.location.origin),
-      {
-        auth: { trackingToken },
-        autoConnect: false,
-      },
-    );
+    const socket = io(getSocketUrl(), {
+      auth: { trackingToken },
+      autoConnect: false,
+    });
 
     socket.on("connect", () => {
       setConnected(true);

@@ -15,6 +15,7 @@ import {
 import type { WorkspaceStore } from "@pasaorder/types";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { cn } from "@/lib/utils";
+import { getSocketUrl } from "@/lib/socket-url";
 import { setDefaultStore } from "./workspace-actions";
 
 export function WorkspaceNavigation({
@@ -77,22 +78,19 @@ export function WorkspaceNavigation({
   useEffect(() => {
     if (!selectedStoreId) return;
     let reconnectTimer: number | undefined;
-    const socket = io(
-      process.env.NEXT_PUBLIC_SOCKET_URL ?? "http://localhost:4000",
-      {
-        auth: (callback) => {
-          fetch("/api/socket-token", { cache: "no-store" })
-            .then(async (response) => {
-              if (!response.ok)
-                throw new Error("Unable to authenticate live updates");
-              return response.json() as Promise<{ token: string }>;
-            })
-            .then(({ token }) => callback({ token }))
-            .catch(() => callback({ token: "" }));
-        },
-        autoConnect: false,
+    const socket = io(getSocketUrl(), {
+      auth: (callback) => {
+        fetch("/api/socket-token", { cache: "no-store" })
+          .then(async (response) => {
+            if (!response.ok)
+              throw new Error("Unable to authenticate live updates");
+            return response.json() as Promise<{ token: string }>;
+          })
+          .then(({ token }) => callback({ token }))
+          .catch(() => callback({ token: "" }));
       },
-    );
+      autoConnect: false,
+    });
     socket.on("connect", () => {
       socket.emit(
         "store:join",
