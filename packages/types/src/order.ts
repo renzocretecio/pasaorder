@@ -1,5 +1,5 @@
 import type { StoreOrderAnswer } from "./catalog.js";
-import type { ProductType } from "./product.js";
+import type { ProductType, QuantityUnit } from "./product.js";
 
 export type OrderStatus =
   "NEW" | "CONFIRMED" | "PREPARING" | "READY" | "COMPLETED" | "CANCELLED";
@@ -87,6 +87,7 @@ export type OrderItem = {
   productName: string;
   productType: ProductType;
   optionLabel: string | null;
+  quantityUnit: QuantityUnit;
   specialInstructions: string | null;
   addOns: { groupName: string; optionName: string; price: string }[];
   productAnswers: StoreOrderAnswer[];
@@ -186,6 +187,7 @@ export type StoreOverview = {
     productId: string;
     name: string;
     units: number;
+    quantityUnit: QuantityUnit;
     revenue: string;
   }[];
 };

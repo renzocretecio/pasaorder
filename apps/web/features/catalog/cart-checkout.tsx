@@ -2,7 +2,15 @@
 
 import { useState, type Dispatch, type SetStateAction } from "react";
 import Link from "next/link";
-import { ArrowLeft, Check, Copy, Minus, Plus, ShoppingBag } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  Copy,
+  Minus,
+  Plus,
+  ShoppingBag,
+  X,
+} from "lucide-react";
 import { Dialog } from "radix-ui";
 import type {
   BusinessCategory,
@@ -13,6 +21,7 @@ import type {
 } from "@pasaorder/types";
 import { Button } from "@/components/ui/button";
 import { orderTypeLabel } from "./order-type-label";
+import { formatQuantity, minimumQuantity } from "./quantity";
 import { CatalogImage } from "./catalog-image";
 import { orderTypes } from "@pasaorder/types";
 import { peso } from "./color";
@@ -195,18 +204,20 @@ export function CartCheckout({
   const [pending, setPending] = useState(false);
   const [idempotencyKey, setIdempotencyKey] = useState<string | null>(null);
   const [placedOrder, setPlacedOrder] = useState<PlacedOrder | null>(null);
-  const cartQuantity = cart.reduce((sum, line) => sum + line.quantity, 0);
+  const cartQuantity = cart.length;
   const subtotalCents = cart.reduce(
     (sum, line) =>
       sum +
-      (cents(line.variant?.price ?? line.item.price) +
-        line.addOns.reduce((extra, choice) => {
-          const option = line.item.addOnGroups
-            .find((group) => group.id === choice.groupId)
-            ?.options.find((entry) => entry.id === choice.optionId);
-          return extra + (option ? cents(option.price) : 0);
-        }, 0)) *
-        line.quantity,
+      Math.round(
+        (cents(line.variant?.price ?? line.item.price) +
+          line.addOns.reduce((extra, choice) => {
+            const option = line.item.addOnGroups
+              .find((group) => group.id === choice.groupId)
+              ?.options.find((entry) => entry.id === choice.optionId);
+            return extra + (option ? cents(option.price) : 0);
+          }, 0)) *
+          line.quantity,
+      ),
     0,
   );
   const subtotal = peso((subtotalCents / 100).toFixed(2));
@@ -237,6 +248,16 @@ export function CartCheckout({
             : line,
         )
         .filter((line) => line.quantity > 0),
+    );
+  }
+
+  function setLineQuantity(key: string, quantity: number) {
+    if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 100) return;
+    const rounded = Math.round(quantity * 1000) / 1000;
+    setCart((current) =>
+      current.map((line) =>
+        line.key === key ? { ...line, quantity: rounded } : line,
+      ),
     );
   }
 
@@ -468,8 +489,11 @@ export function CartCheckout({
                     Your details
                   </Dialog.Title>
                   <Dialog.Description className="mt-0.5 text-sm text-[#59685d]">
-                    {cartQuantity} {cartQuantity === 1 ? "item" : "items"} ·{" "}
-                    {subtotal}
+                    {cartQuantity}{" "}
+                    {cartQuantity === 1
+                      ? "product selection"
+                      : "product selections"}{" "}
+                    · {subtotal}
                   </Dialog.Description>
                 </div>
               </div>
@@ -710,7 +734,10 @@ export function CartCheckout({
                   Your cart
                 </Dialog.Title>
                 <Dialog.Description className="mt-1 text-sm text-[#59685d]">
-                  {cartQuantity} {cartQuantity === 1 ? "item" : "items"}
+                  {cartQuantity}{" "}
+                  {cartQuantity === 1
+                    ? "product selection"
+                    : "product selections"}
                 </Dialog.Description>
               </div>
               <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4">
@@ -758,7 +785,8 @@ export function CartCheckout({
                         </p>
                         <p className="mt-1 text-[13px] text-[var(--store-accent-ink)]">
                           {line.variant ? `${line.variant.label} · ` : ""}
-                          {peso(line.variant?.price ?? line.item.price)} each
+                          {peso(line.variant?.price ?? line.item.price)}
+                          {line.item.quantityUnit === "KG" ? " / kg" : " each"}
                         </p>
                         {line.addOns.length > 0 && (
                           <p className="mt-1 text-[13px] text-[#59685d]">
@@ -801,25 +829,67 @@ export function CartCheckout({
                           </p>
                         )}
                         <div className="mt-2 flex items-center gap-2">
-                          <button
-                            type="button"
-                            aria-label={`Remove one ${line.item.name}`}
-                            onClick={() => changeQuantity(line.key, -1)}
-                            className="grid size-9 place-items-center rounded-lg border border-[#d6dfd6] text-[var(--store-accent-ink)] hover:bg-accent focus-visible:outline-2 focus-visible:outline-[var(--store-accent-ink)]"
-                          >
-                            <Minus className="size-3.5" aria-hidden="true" />
-                          </button>
-                          <span className="min-w-6 text-center text-sm tabular-nums">
-                            {line.quantity}
-                          </span>
-                          <button
-                            type="button"
-                            aria-label={`Add one ${line.item.name}`}
-                            onClick={() => changeQuantity(line.key, 1)}
-                            className="grid size-9 place-items-center rounded-lg border border-[#d6dfd6] text-[var(--store-accent-ink)] hover:bg-accent focus-visible:outline-2 focus-visible:outline-[var(--store-accent-ink)]"
-                          >
-                            <Plus className="size-3.5" aria-hidden="true" />
-                          </button>
+                          {line.item.quantityUnit === "KG" ? (
+                            <>
+                              <label className="flex h-9 items-center gap-1.5 rounded-lg border border-[#d6dfd6] px-2 text-sm">
+                                <span className="sr-only">
+                                  Quantity in kilograms for {line.item.name}
+                                </span>
+                                <input
+                                  type="number"
+                                  inputMode="decimal"
+                                  min={minimumQuantity("KG")}
+                                  max={100}
+                                  step="0.001"
+                                  value={line.quantity}
+                                  onChange={(event) => {
+                                    if (event.target.value !== "")
+                                      setLineQuantity(
+                                        line.key,
+                                        Number(event.target.value),
+                                      );
+                                  }}
+                                  className="w-14 bg-transparent text-center tabular-nums outline-none"
+                                />
+                                <span>kg</span>
+                              </label>
+                              <button
+                                type="button"
+                                aria-label={`Remove ${line.item.name} from cart`}
+                                onClick={() =>
+                                  changeQuantity(line.key, -line.quantity)
+                                }
+                                className="grid size-9 place-items-center rounded-lg border border-[#d6dfd6] text-[#59685d] hover:bg-accent focus-visible:outline-2 focus-visible:outline-[var(--store-accent-ink)]"
+                              >
+                                <X className="size-4" aria-hidden="true" />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                aria-label={`Remove one ${line.item.name}`}
+                                onClick={() => changeQuantity(line.key, -1)}
+                                className="grid size-9 place-items-center rounded-lg border border-[#d6dfd6] text-[var(--store-accent-ink)] hover:bg-accent focus-visible:outline-2 focus-visible:outline-[var(--store-accent-ink)]"
+                              >
+                                <Minus
+                                  className="size-3.5"
+                                  aria-hidden="true"
+                                />
+                              </button>
+                              <span className="min-w-6 text-center text-sm tabular-nums">
+                                {formatQuantity(line.quantity)}
+                              </span>
+                              <button
+                                type="button"
+                                aria-label={`Add one ${line.item.name}`}
+                                onClick={() => changeQuantity(line.key, 1)}
+                                className="grid size-9 place-items-center rounded-lg border border-[#d6dfd6] text-[var(--store-accent-ink)] hover:bg-accent focus-visible:outline-2 focus-visible:outline-[var(--store-accent-ink)]"
+                              >
+                                <Plus className="size-3.5" aria-hidden="true" />
+                              </button>
+                            </>
+                          )}
                           <span className="ml-auto font-semibold tabular-nums text-[var(--store-accent-ink)]">
                             {peso(
                               String(

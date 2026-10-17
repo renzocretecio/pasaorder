@@ -70,7 +70,7 @@ export function manualSubtotal(payload: ManualPayload) {
   return payload.items.reduce(
     (sum, item) =>
       sum +
-      Math.round(Number(item.expectedUnitPrice ?? 0) * 100) * item.quantity,
+      Math.round(Number(item.expectedUnitPrice ?? 0) * 100 * item.quantity),
     0,
   );
 }

@@ -63,11 +63,18 @@ export function restoreCart(
       const item = products.get(saved?.productId);
       const variant =
         item?.variants.find((option) => option.id === saved?.variantId) ?? null;
+      const quantityValid =
+        Number.isFinite(saved?.quantity) &&
+        saved.quantity >= 0.01 &&
+        saved.quantity <= 100 &&
+        (item?.quantityUnit === "KG"
+          ? Math.abs(
+              saved.quantity * 1000 - Math.round(saved.quantity * 1000),
+            ) < 0.000001
+          : Number.isInteger(saved.quantity));
       if (
         !item?.isAvailable ||
-        !Number.isInteger(saved.quantity) ||
-        saved.quantity < 1 ||
-        saved.quantity > 100 ||
+        !quantityValid ||
         typeof saved.instructions !== "string" ||
         saved.instructions.length > 500 ||
         (item.variants.length ? !variant : saved.variantId !== null)

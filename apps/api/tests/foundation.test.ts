@@ -376,6 +376,20 @@ test("mobile numbers are optional for checkout while delivery still needs an add
     true,
   );
   assert.equal(createOrderSchema.safeParse(dineInOrder).success, true);
+  assert.equal(
+    createOrderSchema.safeParse({
+      ...dineInOrder,
+      items: [{ productId: "1", variantId: null, quantity: 0.5 }],
+    }).success,
+    true,
+  );
+  assert.equal(
+    createOrderSchema.safeParse({
+      ...dineInOrder,
+      items: [{ productId: "1", variantId: null, quantity: 0.0001 }],
+    }).success,
+    false,
+  );
   const scheduledFor = new Date(Date.now() + 60 * 60_000).toISOString();
   assert.equal(
     createOrderSchema.safeParse({
@@ -491,6 +505,11 @@ test("catalog items accept one price or distinct priced options", () => {
   assert.equal(
     catalogItemSchema.safeParse({ ...item, price: "120" }).success,
     true,
+  );
+  assert.equal(
+    catalogItemSchema.parse({ ...item, price: "120", quantityUnit: "KG" })
+      .quantityUnit,
+    "KG",
   );
   assert.equal(catalogItemSchema.safeParse(item).success, false);
   assert.equal(

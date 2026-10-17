@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { CatalogImage } from "./catalog-image";
 import { MenuCategories } from "./menu-categories";
 import { accentInk, accentText, peso } from "./color";
+import { formatQuantity, minimumQuantity, quantityLabel } from "./quantity";
 import { CartCheckout } from "./cart-checkout";
 
 import { useMenuRecovery } from "./use-menu-recovery";
@@ -67,12 +68,13 @@ function startingVariant(item: Product) {
 }
 
 function displayPrice(item: Product) {
-  if (!item.variants.length) return peso(item.price);
+  const perKilogram = item.quantityUnit === "KG" ? " / kg" : "";
+  if (!item.variants.length) return `${peso(item.price)}${perKilogram}`;
   const lowest = item.variants.reduce(
     (price, variant) => Math.min(price, Number(variant.price)),
     Number(item.variants[0].price),
   );
-  return `From ${peso(String(lowest))}`;
+  return `From ${peso(String(lowest))}${perKilogram}`;
 }
 
 function formatHour(time: string) {
@@ -153,7 +155,7 @@ export function MenuView({
     selectedItem?.variants.find(
       (variant) => variant.id === selectedVariantId,
     ) ?? null;
-  const cartQuantity = cart.reduce((total, line) => total + line.quantity, 0);
+  const cartQuantity = cart.length;
 
   const todayHours = today
     ? store.operatingHours?.find((hours) => hours.day === today)
@@ -163,7 +165,7 @@ export function MenuView({
     if (!item.isAvailable) return;
     setSelectedItem(item);
     setSelectedVariantId(startingVariant(item));
-    setQuantity(1);
+    setQuantity(item.quantityUnit === "KG" ? 0.5 : 1);
     setSelectedAddOns([]);
     setInstructions("");
     setAddedMessage("");
@@ -186,7 +188,13 @@ export function MenuView({
       if (existing)
         return current.map((line) =>
           line.key === key
-            ? { ...line, quantity: Math.min(100, line.quantity + quantity) }
+            ? {
+                ...line,
+                quantity: Math.min(
+                  100,
+                  Math.round((line.quantity + quantity) * 1000) / 1000,
+                ),
+              }
             : line,
         );
       return [
@@ -202,7 +210,9 @@ export function MenuView({
         },
       ];
     });
-    setAddedMessage(`${quantity} ${selectedItem.name} added to cart.`);
+    setAddedMessage(
+      `${quantityLabel(quantity, selectedItem.quantityUnit)} ${selectedItem.name} added to cart.`,
+    );
     setSelectedItem(null);
   }
 
@@ -497,7 +507,7 @@ export function MenuView({
         type="button"
         onClick={() => setCartOpen(true)}
         className={`fixed right-[max(1.25rem,env(safe-area-inset-right))] z-30 h-14 gap-3 rounded-full px-5 shadow-lg hover:bg-primary hover:brightness-95 ${preview ? "bottom-[calc(var(--workspace-bottom)+1rem)] md:bottom-[max(1.25rem,env(safe-area-inset-bottom))]" : "bottom-[max(1.25rem,env(safe-area-inset-bottom))]"}`}
-        aria-label={`Open cart, ${cartQuantity} ${cartQuantity === 1 ? "item" : "items"}`}
+        aria-label={`Open cart, ${cartQuantity} ${cartQuantity === 1 ? "product selection" : "product selections"}`}
       >
         <ShoppingBag className="size-5" aria-hidden="true" />
         <span>Cart</span>
@@ -588,6 +598,7 @@ export function MenuView({
                           </span>
                           <span className="shrink-0 font-semibold tabular-nums text-[var(--store-accent-ink)]">
                             {peso(variant.price)}
+                            {selectedItem.quantityUnit === "KG" ? " / kg" : ""}
                           </span>
                         </label>
                       ))}
@@ -595,6 +606,7 @@ export function MenuView({
                   ) : (
                     <p className="text-base font-semibold tabular-nums text-[var(--store-accent-ink)]">
                       {peso(selectedItem.price)}
+                      {selectedItem.quantityUnit === "KG" ? " / kg" : ""}
                     </p>
                   )}
                   {selectedItem.addOnGroups.map((group) => (
@@ -658,7 +670,7 @@ export function MenuView({
                             </span>
                             <span className="font-semibold tabular-nums text-[var(--store-accent-ink)]">
                               {Number(option.price)
-                                ? `+${peso(option.price)}`
+                                ? `+${peso(option.price)}${selectedItem.quantityUnit === "KG" ? " / kg" : ""}`
                                 : "Included"}
                             </span>
                           </label>
@@ -689,36 +701,64 @@ export function MenuView({
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-3 border-t border-[#d6dfd6] bg-white px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 sm:pb-4">
-                <div className="flex h-12 shrink-0 items-center rounded-xl border border-[#d6dfd6]">
-                  <button
-                    type="button"
-                    aria-label="Decrease quantity"
-                    disabled={quantity <= 1}
-                    onClick={() =>
-                      setQuantity((current) => Math.max(1, current - 1))
-                    }
-                    className="grid size-11 place-items-center rounded-l-xl text-[var(--store-accent-ink)] hover:bg-accent disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-[var(--store-accent-ink)]"
-                  >
-                    <Minus className="size-4" aria-hidden="true" />
-                  </button>
-                  <span
-                    aria-live="polite"
-                    className="min-w-8 text-center text-sm font-semibold tabular-nums"
-                  >
-                    {quantity}
-                  </span>
-                  <button
-                    type="button"
-                    aria-label="Increase quantity"
-                    disabled={quantity >= 100}
-                    onClick={() =>
-                      setQuantity((current) => Math.min(100, current + 1))
-                    }
-                    className="grid size-11 place-items-center rounded-r-xl text-[var(--store-accent-ink)] hover:bg-accent focus-visible:outline-2 focus-visible:outline-[var(--store-accent-ink)]"
-                  >
-                    <Plus className="size-4" aria-hidden="true" />
-                  </button>
-                </div>
+                {selectedItem.quantityUnit === "KG" ? (
+                  <label className="flex h-12 shrink-0 items-center gap-2 rounded-xl border border-[#d6dfd6] px-3 text-sm font-medium">
+                    <span className="sr-only">Quantity in kilograms</span>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min={minimumQuantity("KG")}
+                      max={100}
+                      step="0.001"
+                      value={quantity}
+                      onChange={(event) => {
+                        if (event.target.value === "") return;
+                        const value = Number(event.target.value);
+                        if (
+                          Number.isFinite(value) &&
+                          value >= minimumQuantity("KG") &&
+                          value <= 100
+                        )
+                          setQuantity(Math.round(value * 1000) / 1000);
+                      }}
+                      className="w-16 bg-transparent text-center text-base outline-none"
+                    />
+                    <span>kg</span>
+                  </label>
+                ) : (
+                  <div className="flex h-12 shrink-0 items-center rounded-xl border border-[#d6dfd6]">
+                    <button
+                      type="button"
+                      aria-label="Decrease quantity"
+                      disabled={quantity <= minimumQuantity("EACH")}
+                      onClick={() =>
+                        setQuantity((current) =>
+                          Math.max(minimumQuantity("EACH"), current - 1),
+                        )
+                      }
+                      className="grid size-11 place-items-center rounded-l-xl text-[var(--store-accent-ink)] hover:bg-accent disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-[var(--store-accent-ink)]"
+                    >
+                      <Minus className="size-4" aria-hidden="true" />
+                    </button>
+                    <span
+                      aria-live="polite"
+                      className="min-w-8 text-center text-sm font-semibold tabular-nums"
+                    >
+                      {formatQuantity(quantity)}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label="Increase quantity"
+                      disabled={quantity >= 100}
+                      onClick={() =>
+                        setQuantity((current) => Math.min(100, current + 1))
+                      }
+                      className="grid size-11 place-items-center rounded-r-xl text-[var(--store-accent-ink)] hover:bg-accent focus-visible:outline-2 focus-visible:outline-[var(--store-accent-ink)]"
+                    >
+                      <Plus className="size-4" aria-hidden="true" />
+                    </button>
+                  </div>
+                )}
                 <Button
                   type="button"
                   onClick={addToCart}

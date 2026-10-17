@@ -15,6 +15,7 @@ export async function GET() {
     { header: "Price", key: "price", width: 16 },
     { header: "Options", key: "options", width: 42 },
     { header: "Available", key: "available", width: 16 },
+    { header: "Unit", key: "unit", width: 14 },
   ];
   products.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
   products.getRow(1).fill = {
@@ -23,7 +24,7 @@ export async function GET() {
     fgColor: { argb: "FF244D35" },
   };
   products.getRow(1).height = 28;
-  products.autoFilter = "A1:F1";
+  products.autoFilter = "A1:G1";
   const guide = workbook.addWorksheet("How to use");
   guide.getColumn(1).width = 22;
   guide.getColumn(2).width = 85;
@@ -40,7 +41,7 @@ export async function GET() {
     ["Description", "Optional. Up to 1,000 characters."],
     [
       "Price",
-      "Required for a product without options. Example: 120 or 120.50. Leave blank when using Options.",
+      "Required for a product without options. This is the price per Unit. Example: 120 or 120.50. Leave blank when using Options.",
     ],
     [
       "Options",
@@ -51,10 +52,18 @@ export async function GET() {
       "Optional. Yes by default. Use No to hide a product from ordering.",
     ],
     [
-      "Example 1",
-      "Coffee | Iced Americano | Espresso over ice | | Small:120; Large:150 | Yes",
+      "Unit",
+      "Optional. Use Each (default) or kg for products priced per kilogram.",
     ],
-    ["Example 2", "Pastries | Empanada | Baked fresh daily | 85 | | Yes"],
+    [
+      "Example 1",
+      "Coffee | Iced Americano | Espresso over ice | | Small:120; Large:150 | Yes | Each",
+    ],
+    [
+      "Example 2",
+      "Pastries | Empanada | Baked fresh daily | 85 | | Yes | Each",
+    ],
+    ["Example 3", "Market | Ground coffee | Fresh ground | 900 | | Yes | kg"],
     [
       "Limit",
       `At least ${MIN_CATALOG_IMPORT_ITEMS} products per workbook. Images can be added after import.`,

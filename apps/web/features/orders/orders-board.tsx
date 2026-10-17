@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { peso } from "@/features/catalog/color";
 import { orderTypeLabel } from "@/features/catalog/order-type-label";
+import { quantityLabel } from "@/features/catalog/quantity";
 import {
   loadPastOrdersPage,
   updateOrderPayment,
@@ -303,7 +304,7 @@ function OrderRow({
               <li key={item.id} className="flex justify-between gap-4">
                 <span className="min-w-0 break-words">
                   <span className="font-medium tabular-nums">
-                    {item.quantity} ×
+                    {quantityLabel(item.quantity, item.quantityUnit)} ×
                   </span>{" "}
                   {item.productName}
                   {item.optionLabel ? ` · ${item.optionLabel}` : ""}

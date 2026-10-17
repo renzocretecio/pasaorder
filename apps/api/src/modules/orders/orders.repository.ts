@@ -125,6 +125,7 @@ async function createOrder(
       productName: string;
       productType: "PHYSICAL" | "MADE_TO_ORDER" | "SERVICE";
       optionLabel: string | null;
+      quantityUnit: "EACH" | "KG";
       specialInstructions: string | null;
       quantity: number;
       unitPrice: string;
@@ -140,6 +141,7 @@ async function createOrder(
         name: string;
         productType: "PHYSICAL" | "MADE_TO_ORDER" | "SERVICE";
         price: string;
+        quantityUnit: "EACH" | "KG";
         isAvailable: boolean;
         variantId: string | null;
         variantLabel: string | null;
@@ -153,7 +155,7 @@ async function createOrder(
           options: { id: string; name: string; price: string }[];
         }[];
       }>(
-        `SELECT p.id, p.name, p.product_type AS "productType", p.price, p.add_on_groups AS "addOnGroups", p.is_available AS "isAvailable", v.id AS "variantId", v.label AS "variantLabel", v.price AS "variantPrice", EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = p.id) AS "hasVariants" FROM products p JOIN categories c ON c.id = p.category_id LEFT JOIN product_variants v ON v.product_id = p.id AND v.id = $3 WHERE p.id = $1 AND c.store_id = $2`,
+        `SELECT p.id, p.name, p.product_type AS "productType", p.price, p.quantity_unit AS "quantityUnit", p.add_on_groups AS "addOnGroups", p.is_available AS "isAvailable", v.id AS "variantId", v.label AS "variantLabel", v.price AS "variantPrice", EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id = p.id) AS "hasVariants" FROM products p JOIN categories c ON c.id = p.category_id LEFT JOIN product_variants v ON v.product_id = p.id AND v.id = $3 WHERE p.id = $1 AND c.store_id = $2`,
         [line.productId, store.id, line.variantId],
       );
       const item = product.rows[0];
@@ -161,6 +163,11 @@ async function createOrder(
         throw new AppError(
           400,
           "One of the selected items is no longer available. Refresh the menu and try again.",
+        );
+      if (item.quantityUnit === "EACH" && !Number.isInteger(line.quantity))
+        throw new AppError(
+          400,
+          `${item.name} is sold by item. Enter a whole-number quantity.`,
         );
       if (
         (item.variantId ?? null) !== line.variantId ||
@@ -225,13 +232,14 @@ async function createOrder(
           409,
           "A menu price changed while this order was offline. Refresh the catalog and review the order before syncing.",
         );
-      const lineCents = cents(fullUnitPrice) * line.quantity;
+      const lineCents = Math.round(cents(fullUnitPrice) * line.quantity);
       totalCents += lineCents;
       orderItems.push({
         productId: item.id,
         productName: item.name,
         productType: item.productType,
         optionLabel: item.variantLabel,
+        quantityUnit: item.quantityUnit,
         specialInstructions: line.specialInstructions || null,
         quantity: line.quantity,
         unitPrice: fullUnitPrice,
@@ -264,13 +272,14 @@ async function createOrder(
     );
     for (const item of orderItems) {
       await client.query(
-        `INSERT INTO order_items (order_id, product_id, product_name, product_type, option_label, special_instructions, quantity, unit_price, subtotal, add_ons, product_answers) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb)`,
+        `INSERT INTO order_items (order_id, product_id, product_name, product_type, option_label, quantity_unit, special_instructions, quantity, unit_price, subtotal, add_ons, product_answers) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb)`,
         [
           created.rows[0].id,
           item.productId,
           item.productName,
           item.productType,
           item.optionLabel,
+          item.quantityUnit,
           item.specialInstructions,
           item.quantity,
           item.unitPrice,
@@ -313,7 +322,7 @@ export async function getPublicOrder(trackingToken: string) {
   );
   if (!result.rows[0]) throw new AppError(404, "Order not found");
   const items = await pool.query(
-    `SELECT product_name AS "productName", product_type AS "productType", option_label AS "optionLabel", add_ons AS "addOns", product_answers AS "productAnswers", quantity, unit_price AS "unitPrice", subtotal FROM order_items WHERE order_id = $1 ORDER BY id`,
+    `SELECT product_name AS "productName", product_type AS "productType", option_label AS "optionLabel", quantity_unit AS "quantityUnit", add_ons AS "addOns", product_answers AS "productAnswers", quantity::float8 AS quantity, unit_price AS "unitPrice", subtotal FROM order_items WHERE order_id = $1 ORDER BY id`,
     [result.rows[0].id],
   );
   return { ...result.rows[0], items: items.rows };
@@ -373,15 +382,16 @@ export async function getStoreOverview(
       productId: string;
       name: string;
       units: number;
+      quantityUnit: "EACH" | "KG";
       revenue: string;
     }>(
       `SELECT oi.product_id::text AS "productId", MAX(oi.product_name) AS name,
-        SUM(oi.quantity)::int AS units, SUM(oi.subtotal)::text AS revenue
+        SUM(oi.quantity)::float8 AS units, oi.quantity_unit AS "quantityUnit", SUM(oi.subtotal)::text AS revenue
       FROM order_items oi JOIN orders o ON o.id = oi.order_id
       WHERE o.store_id = $1 AND o.status = 'COMPLETED'
         AND (o.created_at AT TIME ZONE 'Asia/Manila')::date >= $2::date
         AND (o.created_at AT TIME ZONE 'Asia/Manila')::date <= $3::date
-      GROUP BY oi.product_id ORDER BY units DESC, revenue DESC, name ASC LIMIT 5`,
+      GROUP BY oi.product_id, oi.quantity_unit ORDER BY units DESC, revenue DESC, name ASC LIMIT 5`,
       [storeId, range.from, range.to],
     ),
   ]);
@@ -409,7 +419,7 @@ type OwnerOrderRow = Omit<
 async function withOrderItems(orders: OwnerOrderRow[]): Promise<OwnerOrder[]> {
   const itemResult = orders.length
     ? await pool.query<OwnerOrder["items"][number]>(
-        `SELECT id, order_id AS "orderId", product_id AS "productId", product_name AS "productName", product_type AS "productType", option_label AS "optionLabel", special_instructions AS "specialInstructions", add_ons AS "addOns", product_answers AS "productAnswers", quantity, unit_price AS "unitPrice", subtotal FROM order_items WHERE order_id = ANY($1::bigint[]) ORDER BY id`,
+        `SELECT id, order_id AS "orderId", product_id AS "productId", product_name AS "productName", product_type AS "productType", option_label AS "optionLabel", quantity_unit AS "quantityUnit", special_instructions AS "specialInstructions", add_ons AS "addOns", product_answers AS "productAnswers", quantity::float8 AS quantity, unit_price AS "unitPrice", subtotal FROM order_items WHERE order_id = ANY($1::bigint[]) ORDER BY id`,
         [orders.map((order) => order.id)],
       )
     : { rows: [] };
