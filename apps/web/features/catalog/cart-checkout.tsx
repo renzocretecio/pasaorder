@@ -786,7 +786,9 @@ export function CartCheckout({
                         <p className="mt-1 text-[13px] text-[var(--store-accent-ink)]">
                           {line.variant ? `${line.variant.label} · ` : ""}
                           {peso(line.variant?.price ?? line.item.price)}
-                          {line.item.quantityUnit === "KG" ? " / kg" : " each"}
+                          {line.item.quantityUnit === "KG"
+                            ? " per kg"
+                            : " each"}
                         </p>
                         {line.addOns.length > 0 && (
                           <p className="mt-1 text-[13px] text-[#59685d]">
