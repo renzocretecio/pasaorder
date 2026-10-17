@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { peso } from "@/features/catalog/color";
 import { orderTypeLabel } from "@/features/catalog/order-type-label";
 import { quantityLabel } from "@/features/catalog/quantity";
+import { getSocketUrl } from "@/lib/socket-url";
 import {
   loadPastOrdersPage,
   updateOrderPayment,
@@ -965,9 +966,7 @@ export function OrdersBoard({
   useEffect(() => {
     let active = true;
     let liveConnected = false;
-    const socketUrl =
-      process.env.NEXT_PUBLIC_SOCKET_URL ?? "http://localhost:4000";
-    const socket = io(socketUrl, {
+    const socket = io(getSocketUrl(), {
       auth: (callback) => {
         fetch("/api/socket-token", { cache: "no-store" })
           .then(async (response) => {
