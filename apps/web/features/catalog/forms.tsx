@@ -890,7 +890,7 @@ export function ItemForm({
                 </div>
                 <div className="min-w-0 space-y-2">
                   <Label htmlFor={`${variantFieldId}-${variant.key}-price`}>
-                    {quantityUnit === "KG" ? "PHP / kg" : "PHP / item"}
+                    {quantityUnit === "KG" ? "PHP per kg" : "PHP per item"}
                   </Label>
                   <Input
                     id={`${variantFieldId}-${variant.key}-price`}

@@ -68,7 +68,7 @@ function startingVariant(item: Product) {
 }
 
 function displayPrice(item: Product) {
-  const perKilogram = item.quantityUnit === "KG" ? " / kg" : "";
+  const perKilogram = item.quantityUnit === "KG" ? " per kg" : "";
   if (!item.variants.length) return `${peso(item.price)}${perKilogram}`;
   const lowest = item.variants.reduce(
     (price, variant) => Math.min(price, Number(variant.price)),
@@ -598,7 +598,9 @@ export function MenuView({
                           </span>
                           <span className="shrink-0 font-semibold tabular-nums text-[var(--store-accent-ink)]">
                             {peso(variant.price)}
-                            {selectedItem.quantityUnit === "KG" ? " / kg" : ""}
+                            {selectedItem.quantityUnit === "KG"
+                              ? " per kg"
+                              : ""}
                           </span>
                         </label>
                       ))}
@@ -606,7 +608,7 @@ export function MenuView({
                   ) : (
                     <p className="text-base font-semibold tabular-nums text-[var(--store-accent-ink)]">
                       {peso(selectedItem.price)}
-                      {selectedItem.quantityUnit === "KG" ? " / kg" : ""}
+                      {selectedItem.quantityUnit === "KG" ? " per kg" : ""}
                     </p>
                   )}
                   {selectedItem.addOnGroups.map((group) => (
@@ -670,7 +672,7 @@ export function MenuView({
                             </span>
                             <span className="font-semibold tabular-nums text-[var(--store-accent-ink)]">
                               {Number(option.price)
-                                ? `+${peso(option.price)}${selectedItem.quantityUnit === "KG" ? " / kg" : ""}`
+                                ? `+${peso(option.price)}${selectedItem.quantityUnit === "KG" ? " per kg" : ""}`
                                 : "Included"}
                             </span>
                           </label>

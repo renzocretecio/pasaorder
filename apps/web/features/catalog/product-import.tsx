@@ -194,9 +194,9 @@ export function ProductImport({ storeId }: { storeId: string }) {
                 <span className="text-sm font-medium tabular-nums text-primary">
                   {item.variants.length
                     ? `${item.variants.length} ${item.variants.length === 1 ? "option" : "options"}`
-                    : `₱${item.price}${item.quantityUnit === "KG" ? " / kg" : ""}`}
+                    : `₱${item.price}${item.quantityUnit === "KG" ? " per kg" : ""}`}
                   {item.variants.length > 0 && item.quantityUnit === "KG"
-                    ? " / kg"
+                    ? " per kg"
                     : ""}
                 </span>
               </div>
