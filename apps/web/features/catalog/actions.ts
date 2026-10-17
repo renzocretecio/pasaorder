@@ -219,6 +219,7 @@ async function mutateCatalog(
       categoryId: values.categoryId ?? "",
       name: values.name ?? "",
       productType: values.productType ?? "PHYSICAL",
+      quantityUnit: values.quantityUnit ?? "EACH",
       description: values.description ?? "",
       ...(values.price ? { price: values.price } : {}),
       addOnGroups: parseJsonField(values.addOnGroups, []),

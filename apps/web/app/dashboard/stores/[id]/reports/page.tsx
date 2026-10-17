@@ -3,6 +3,7 @@ import { ChartNoAxesCombined, PackageCheck, ReceiptText } from "lucide-react";
 import type { StoreOverview } from "@pasaorder/types";
 import { overviewDateRangeSchema } from "@pasaorder/validation";
 import { peso } from "@/features/catalog/color";
+import { formatQuantity } from "@/features/catalog/quantity";
 import { PageHeading } from "@/features/catalog/workspace";
 import { OverviewDateRange } from "@/features/orders/overview-date-range";
 import { OverviewRefresh } from "@/features/orders/overview-refresh";
@@ -181,7 +182,12 @@ export default async function StoreReportsPage({
                       {product.name}
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      {product.units} {product.units === 1 ? "unit" : "units"}{" "}
+                      {formatQuantity(product.units)}{" "}
+                      {product.quantityUnit === "KG"
+                        ? "kg"
+                        : product.units === 1
+                          ? "unit"
+                          : "units"}{" "}
                       sold
                     </p>
                   </div>

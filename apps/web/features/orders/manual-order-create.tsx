@@ -11,12 +11,22 @@ import {
 import { useRouter } from "next/navigation";
 import { Dialog } from "radix-ui";
 import { Check, Minus, Plus, Search, Trash2, WifiOff, X } from "lucide-react";
-import type { Catalog, OrderType, PaymentMethod } from "@pasaorder/types";
+import type {
+  Catalog,
+  OrderType,
+  PaymentMethod,
+  QuantityUnit,
+} from "@pasaorder/types";
 import { createManualOrderSchema } from "@pasaorder/validation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { peso } from "@/features/catalog/color";
+import {
+  minimumQuantity,
+  quantityLabel,
+  quantityStep,
+} from "@/features/catalog/quantity";
 import { orderTypeLabel } from "@/features/catalog/order-type-label";
 import { createManualOrder, loadManualOrderCatalog } from "./actions";
 import {
@@ -29,7 +39,10 @@ import {
   type SavedManualOrder,
 } from "./manual-order-queue";
 
-type Line = ManualPayload["items"][number] & { name: string };
+type Line = ManualPayload["items"][number] & {
+  name: string;
+  quantityUnit: QuantityUnit;
+};
 type Receipt = { id: string; text: string; orderId?: string };
 const control =
   "min-h-11 w-full rounded-xl border border-input bg-background px-3 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -92,8 +105,9 @@ export function ManualOrderCreate({ catalog }: { catalog: Catalog }) {
                 (variant) => ({
                   productId: product.id,
                   variantId: variant?.id ?? null,
-                  quantity: 1,
+                  quantity: product.quantityUnit === "KG" ? 0.5 : 1,
                   expectedUnitPrice: variant?.price ?? product.price,
+                  quantityUnit: product.quantityUnit,
                   name: product.name + (variant ? ` · ${variant.label}` : ""),
                   category: category.name,
                 }),
@@ -146,7 +160,7 @@ export function ManualOrderCreate({ catalog }: { catalog: Catalog }) {
   const total = lines.reduce(
     (sum, line) =>
       sum +
-      Math.round(Number(line.expectedUnitPrice ?? 0) * 100) * line.quantity,
+      Math.round(Number(line.expectedUnitPrice ?? 0) * 100 * line.quantity),
     0,
   );
 
@@ -321,7 +335,13 @@ export function ManualOrderCreate({ catalog }: { catalog: Catalog }) {
     setLines((current) =>
       current.map((line, position) =>
         position === index
-          ? { ...line, quantity: Math.max(1, Math.min(100, quantity)) }
+          ? {
+              ...line,
+              quantity: Math.max(
+                minimumQuantity(line.quantityUnit),
+                Math.min(100, Math.round(quantity * 1000) / 1000),
+              ),
+            }
           : line,
       ),
     );
@@ -338,7 +358,13 @@ export function ManualOrderCreate({ catalog }: { catalog: Catalog }) {
       if (index >= 0)
         return current.map((line, position) =>
           position === index
-            ? { ...line, quantity: Math.min(100, line.quantity + 1) }
+            ? {
+                ...line,
+                quantity: Math.min(
+                  100,
+                  line.quantity + quantityStep(line.quantityUnit),
+                ),
+              }
             : line,
         );
       return current.length >= 100 ? current : [...current, choice];
@@ -396,6 +422,7 @@ export function ManualOrderCreate({ catalog }: { catalog: Catalog }) {
             );
             return {
               ...line,
+              quantityUnit: product?.quantityUnit ?? "EACH",
               name:
                 entry.names[index] ??
                 (product
@@ -617,7 +644,7 @@ export function ManualOrderCreate({ catalog }: { catalog: Catalog }) {
                     ? entry.names
                         .map(
                           (name, index) =>
-                            `${entry.payload.items[index]?.quantity ?? 1} × ${name}`,
+                            `${quantityLabel(entry.payload.items[index]?.quantity ?? 1, products.find((product) => product.id === entry.payload.items[index]?.productId)?.quantityUnit ?? "EACH")} × ${name}`,
                         )
                         .join(", ")
                     : "Open review to see the saved items."}
@@ -798,6 +825,7 @@ export function ManualOrderCreate({ catalog }: { catalog: Catalog }) {
                           </span>
                           <span className="shrink-0 text-sm tabular-nums">
                             {peso(choice.expectedUnitPrice)}
+                            {choice.quantityUnit === "KG" ? " / kg" : ""}
                           </span>
                           <Plus
                             className="size-4 shrink-0"
@@ -917,7 +945,12 @@ export function ManualOrderCreate({ catalog }: { catalog: Catalog }) {
                                     <span className="flex-1">
                                       {option.name}
                                     </span>
-                                    <span>+{peso(option.price)}</span>
+                                    <span>
+                                      +{peso(option.price)}
+                                      {product.quantityUnit === "KG"
+                                        ? " / kg"
+                                        : ""}
+                                    </span>
                                   </label>
                                 );
                               })}
@@ -1022,17 +1055,17 @@ export function ManualOrderCreate({ catalog }: { catalog: Catalog }) {
                               <p className="mt-1 text-sm text-muted-foreground">
                                 {line.expectedUnitPrice === undefined
                                   ? "Saved price unavailable"
-                                  : `${peso(line.expectedUnitPrice)} each`}
+                                  : `${peso(line.expectedUnitPrice)}${line.quantityUnit === "KG" ? " / kg" : " each"}`}
                               </p>
                             </div>
                             <span className="shrink-0 tabular-nums">
                               {peso(
                                 (
-                                  (Math.round(
-                                    Number(line.expectedUnitPrice ?? 0) * 100,
-                                  ) *
-                                    line.quantity) /
-                                  100
+                                  Math.round(
+                                    Number(line.expectedUnitPrice ?? 0) *
+                                      100 *
+                                      line.quantity,
+                                  ) / 100
                                 ).toFixed(2),
                               )}
                             </span>
@@ -1065,44 +1098,74 @@ export function ManualOrderCreate({ catalog }: { catalog: Catalog }) {
                             </div>
                           )}
                           <div className="flex items-center gap-1">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className="size-11"
-                              aria-label={`Decrease ${line.name}`}
-                              disabled={line.quantity <= 1}
-                              onClick={() =>
-                                updateQuantity(index, line.quantity - 1)
-                              }
-                            >
-                              <Minus />
-                            </Button>
-                            <Input
-                              aria-label={`Quantity for ${line.name}`}
-                              type="number"
-                              inputMode="numeric"
-                              min={1}
-                              max={100}
-                              value={line.quantity}
-                              onChange={(event) => {
-                                const value = Number(event.target.value);
-                                if (Number.isInteger(value))
-                                  updateQuantity(index, value);
-                              }}
-                              className="h-11 w-16 text-center text-base md:text-base"
-                            />
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className="size-11"
-                              aria-label={`Increase ${line.name}`}
-                              disabled={line.quantity >= 100}
-                              onClick={() =>
-                                updateQuantity(index, line.quantity + 1)
-                              }
-                            >
-                              <Plus />
-                            </Button>
+                            {line.quantityUnit === "KG" ? (
+                              <label className="flex h-11 items-center gap-1 rounded-xl border bg-background px-2">
+                                <span className="sr-only">
+                                  Quantity in kilograms for {line.name}
+                                </span>
+                                <Input
+                                  aria-label={`Quantity in kilograms for ${line.name}`}
+                                  type="number"
+                                  inputMode="decimal"
+                                  min={minimumQuantity("KG")}
+                                  max={100}
+                                  step="0.001"
+                                  value={line.quantity}
+                                  onChange={(event) => {
+                                    if (event.target.value !== "")
+                                      updateQuantity(
+                                        index,
+                                        Number(event.target.value),
+                                      );
+                                  }}
+                                  className="h-9 w-20 border-0 bg-transparent p-0 text-center text-base shadow-none md:text-base"
+                                />
+                                <span className="text-sm text-muted-foreground">
+                                  kg
+                                </span>
+                              </label>
+                            ) : (
+                              <>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="size-11"
+                                  aria-label={`Decrease ${line.name}`}
+                                  disabled={line.quantity <= 1}
+                                  onClick={() =>
+                                    updateQuantity(index, line.quantity - 1)
+                                  }
+                                >
+                                  <Minus />
+                                </Button>
+                                <Input
+                                  aria-label={`Quantity for ${line.name}`}
+                                  type="number"
+                                  inputMode="numeric"
+                                  min={1}
+                                  max={100}
+                                  value={line.quantity}
+                                  onChange={(event) => {
+                                    const value = Number(event.target.value);
+                                    if (Number.isInteger(value))
+                                      updateQuantity(index, value);
+                                  }}
+                                  className="h-11 w-16 text-center text-base md:text-base"
+                                />
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="size-11"
+                                  aria-label={`Increase ${line.name}`}
+                                  disabled={line.quantity >= 100}
+                                  onClick={() =>
+                                    updateQuantity(index, line.quantity + 1)
+                                  }
+                                >
+                                  <Plus />
+                                </Button>
+                              </>
+                            )}
                             <Button
                               type="button"
                               variant="ghost"

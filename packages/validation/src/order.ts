@@ -37,7 +37,16 @@ const createOrderBaseSchema = z
         z.object({
           productId: idSchema,
           variantId: idSchema.nullable(),
-          quantity: z.number().int().positive().max(100),
+          quantity: z
+            .number()
+            .min(0.01)
+            .max(100)
+            .refine(
+              (quantity) =>
+                Math.abs(quantity * 1000 - Math.round(quantity * 1000)) <
+                0.000001,
+              "Use a quantity with up to three decimal places",
+            ),
           specialInstructions: z.string().trim().max(500).optional(),
           addOns: z
             .array(z.object({ groupId: z.uuid(), optionId: z.uuid() }).strict())

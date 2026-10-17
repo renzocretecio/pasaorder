@@ -81,7 +81,8 @@ export function ProductImport({ storeId }: { storeId: string }) {
             </h2>
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
               One product per row. Use Category, Product, and either Price or
-              Options. New categories are created automatically.
+              Options. Set Unit to kg for products priced by weight. New
+              categories are created automatically.
             </p>
             <a
               href="/dashboard/catalog-template.xlsx"
@@ -193,7 +194,10 @@ export function ProductImport({ storeId }: { storeId: string }) {
                 <span className="text-sm font-medium tabular-nums text-primary">
                   {item.variants.length
                     ? `${item.variants.length} ${item.variants.length === 1 ? "option" : "options"}`
-                    : `₱${item.price}`}
+                    : `₱${item.price}${item.quantityUnit === "KG" ? " / kg" : ""}`}
+                  {item.variants.length > 0 && item.quantityUnit === "KG"
+                    ? " / kg"
+                    : ""}
                 </span>
               </div>
             ))}

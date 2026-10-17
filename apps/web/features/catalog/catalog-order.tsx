@@ -409,6 +409,7 @@ export function CatalogOrder({
                                 <span className="text-base font-semibold text-foreground tabular-nums">
                                   {item.variants.length > 0 && "From "}
                                   {peso(item.price)}
+                                  {item.quantityUnit === "KG" ? " / kg" : ""}
                                 </span>
                                 <span
                                   className={`inline-flex items-center gap-1.5 ${item.isAvailable ? "text-emerald-800" : "text-muted-foreground"}`}

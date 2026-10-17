@@ -13,7 +13,9 @@ const headers = [
   "Price",
   "Options",
   "Available",
+  "Unit",
 ];
+const legacyHeaders = headers.slice(0, -1);
 const maxFileBytes = 2 * 1024 * 1024;
 
 function cellText(cell: ExcelJS.Cell, column: string) {
@@ -48,8 +50,8 @@ export async function parseProductWorkbook(
   }
   const sheet = workbook.worksheets[0];
   if (!sheet) throw new Error("The workbook has no worksheet.");
-  const actualHeaders = headers.map((_, index) =>
-    cellText(sheet.getRow(1).getCell(index + 1), headers[index]),
+  const actualHeaders = legacyHeaders.map((_, index) =>
+    cellText(sheet.getRow(1).getCell(index + 1), legacyHeaders[index]),
   );
   if (
     actualHeaders.some(
@@ -57,6 +59,9 @@ export async function parseProductWorkbook(
     )
   )
     throw new Error(`The first row must be: ${headers.join(", ")}.`);
+  const unitHeader = cellText(sheet.getRow(1).getCell(7), "Unit");
+  if (unitHeader && unitHeader.toLowerCase() !== "unit")
+    throw new Error('Column G must be named "Unit" when included.');
   if (sheet.rowCount > MAX_CATALOG_IMPORT_ITEMS + 1)
     throw new Error("The worksheet has too many rows.");
   const items: CatalogImportInput["items"] = [];
@@ -66,9 +71,17 @@ export async function parseProductWorkbook(
     if (row === 1) return;
     try {
       const [category, name, description, price, options, available] =
-        headers.map((header, index) =>
+        legacyHeaders.map((header, index) =>
           cellText(sheetRow.getCell(index + 1), header),
         );
+      const unitText = cellText(sheetRow.getCell(7), "Unit").toLowerCase();
+      const quantityUnit =
+        unitText === "kg" || unitText === "kilogram"
+          ? "KG"
+          : unitText === "" || unitText === "each" || unitText === "item"
+            ? "EACH"
+            : null;
+      if (quantityUnit === null) throw new Error("Unit must be Each or kg");
       if (
         ![category, name, description, price, options, available].some(Boolean)
       )
@@ -97,6 +110,7 @@ export async function parseProductWorkbook(
         category,
         name,
         description,
+        quantityUnit,
         ...(price ? { price } : {}),
         variants,
         isAvailable,

@@ -293,6 +293,7 @@ export const catalogItemSchema = z
     productType: z
       .enum(["PHYSICAL", "MADE_TO_ORDER", "SERVICE"])
       .default("PHYSICAL"),
+    quantityUnit: z.enum(["EACH", "KG"]).default("EACH"),
     description: optionalText(1000),
     price: priceSchema.optional(),
     variants: z.array(variantSchema).max(40).default([]),
@@ -362,6 +363,7 @@ export const catalogImportSchema = z
             category: z.string().trim().min(2).max(120),
             name: z.string().trim().min(2).max(120),
             description: optionalText(1000),
+            quantityUnit: z.enum(["EACH", "KG"]).default("EACH"),
             price: priceSchema.optional(),
             variants: z.array(variantSchema.omit({ id: true })).max(40),
             isAvailable: z.boolean(),

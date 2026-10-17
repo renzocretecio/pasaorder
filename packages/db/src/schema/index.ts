@@ -160,6 +160,10 @@ export const products = pgTable("products", {
   addOnGroups: jsonb("add_on_groups").notNull().default([]),
   orderQuestions: jsonb("order_questions").notNull().default([]),
   price: numeric("price", { precision: 10, scale: 2 }).notNull(),
+  quantityUnit: varchar("quantity_unit", { length: 8 })
+    .$type<"EACH" | "KG">()
+    .notNull()
+    .default("EACH"),
   imageUrl: text("image_url"),
   isAvailable: boolean("is_available").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
@@ -353,10 +357,14 @@ export const orderItems = pgTable("order_items", {
     .notNull()
     .default("PHYSICAL"),
   optionLabel: varchar("option_label", { length: 80 }),
+  quantityUnit: varchar("quantity_unit", { length: 8 })
+    .$type<"EACH" | "KG">()
+    .notNull()
+    .default("EACH"),
   specialInstructions: varchar("special_instructions", { length: 500 }),
   addOns: jsonb("add_ons").notNull().default([]),
   productAnswers: jsonb("product_answers").notNull().default([]),
-  quantity: integer("quantity").notNull(),
+  quantity: numeric("quantity", { precision: 10, scale: 3 }).notNull(),
   unitPrice: numeric("unit_price", { precision: 10, scale: 2 }).notNull(),
   subtotal: numeric("subtotal", { precision: 10, scale: 2 }).notNull(),
 });

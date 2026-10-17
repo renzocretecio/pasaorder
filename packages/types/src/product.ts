@@ -34,6 +34,7 @@ export type Product = {
   productType: ProductType;
   description: string | null;
   price: string;
+  quantityUnit: QuantityUnit;
   variants: ProductVariant[];
   addOnGroups: ProductAddonGroup[];
   orderQuestions: StoreOrderQuestion[];
@@ -42,5 +43,7 @@ export type Product = {
   sortOrder: number;
   createdAt: string;
 };
+export const quantityUnits = ["EACH", "KG"] as const;
+export type QuantityUnit = (typeof quantityUnits)[number];
 export const productTypes = ["PHYSICAL", "MADE_TO_ORDER", "SERVICE"] as const;
 export type ProductType = (typeof productTypes)[number];

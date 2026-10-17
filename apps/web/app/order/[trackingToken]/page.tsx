@@ -10,12 +10,14 @@ import type {
   OrderWorkflow,
   StoreOrderAnswer,
   BusinessCategory,
+  QuantityUnit,
 } from "@pasaorder/types";
 import { CopyPaymentDetails } from "@/features/catalog/copy-payment-details";
 import { PaymentProofUpload } from "@/features/orders/payment-proof-upload";
 import { CustomerReadyAlert } from "@/features/notifications/customer-ready-alert";
 import { CustomerOrderLiveUpdates } from "@/features/orders/customer-order-live-updates";
 import { orderTypeLabel } from "@/features/catalog/order-type-label";
+import { quantityLabel } from "@/features/catalog/quantity";
 
 export const metadata: Metadata = {
   title: "Order status | PasaOrder",
@@ -46,6 +48,7 @@ type TrackedOrder = {
     productName: string;
     productType: "PHYSICAL" | "MADE_TO_ORDER" | "SERVICE";
     optionLabel: string | null;
+    quantityUnit: QuantityUnit;
     productAnswers: StoreOrderAnswer[];
     addOns: { groupName: string; optionName: string; price: string }[];
     quantity: number;
@@ -133,7 +136,8 @@ export default async function OrderTrackingPage({
               >
                 <div className="min-w-0">
                   <p className="font-medium">
-                    {item.quantity} × {item.productName}
+                    {quantityLabel(item.quantity, item.quantityUnit)} ×{" "}
+                    {item.productName}
                   </p>
                   {item.productType !== "PHYSICAL" && (
                     <p className="mt-1 text-[#59685d]">

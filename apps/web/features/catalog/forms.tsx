@@ -699,6 +699,11 @@ export function ItemForm({
   const [singlePrice, setSinglePrice] = useState(
     state.values?.price ?? item?.price ?? "",
   );
+  const [quantityUnit, setQuantityUnit] = useState<"EACH" | "KG">(
+    (state.values?.quantityUnit as "EACH" | "KG" | undefined) ??
+      item?.quantityUnit ??
+      "EACH",
+  );
   const [variants, setVariants] = useState(
     item?.variants.map((variant) => ({
       key: variant.id,
@@ -783,6 +788,28 @@ export function ItemForm({
             </select>
           )}
         </Field>
+        <Field
+          name="quantityUnit"
+          label="Sell by"
+          state={state}
+          hint="Choose whether the price is for one item or one kilogram."
+        >
+          {(control) => (
+            <select
+              {...control}
+              name="quantityUnit"
+              required
+              value={quantityUnit}
+              onChange={(event) =>
+                setQuantityUnit(event.target.value as "EACH" | "KG")
+              }
+              className={selectStyle}
+            >
+              <option value="EACH">Each item</option>
+              <option value="KG">Kilogram (kg)</option>
+            </select>
+          )}
+        </Field>
         <div className="space-y-3">
           <p className="text-[13px] font-medium">How is it priced?</p>
           <div className="grid grid-cols-2 gap-2">
@@ -863,7 +890,7 @@ export function ItemForm({
                 </div>
                 <div className="min-w-0 space-y-2">
                   <Label htmlFor={`${variantFieldId}-${variant.key}-price`}>
-                    PHP
+                    {quantityUnit === "KG" ? "PHP / kg" : "PHP / item"}
                   </Label>
                   <Input
                     id={`${variantFieldId}-${variant.key}-price`}
@@ -944,7 +971,11 @@ export function ItemForm({
         ) : (
           <Field
             name="price"
-            label="Price (PHP)"
+            label={
+              quantityUnit === "KG"
+                ? "Price per kilogram (PHP)"
+                : "Price per item (PHP)"
+            }
             state={state}
             required
             inputMode="decimal"

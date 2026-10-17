@@ -71,7 +71,7 @@ export async function readCatalog(
   const rows = await pool.query<
     Omit<Product, "createdAt" | "variants"> & { createdAt: Date }
   >(
-    `SELECT p.id, p.category_id AS "categoryId", p.name, p.product_type AS "productType", p.description, p.add_on_groups AS "addOnGroups", p.order_questions AS "orderQuestions", p.price, p.image_url AS "imageUrl", p.is_available AS "isAvailable", p.sort_order AS "sortOrder", p.created_at AS "createdAt" FROM products p JOIN categories c ON c.id = p.category_id WHERE c.store_id = $1 ORDER BY p.sort_order, p.id`,
+    `SELECT p.id, p.category_id AS "categoryId", p.name, p.product_type AS "productType", p.description, p.add_on_groups AS "addOnGroups", p.order_questions AS "orderQuestions", p.price, p.quantity_unit AS "quantityUnit", p.image_url AS "imageUrl", p.is_available AS "isAvailable", p.sort_order AS "sortOrder", p.created_at AS "createdAt" FROM products p JOIN categories c ON c.id = p.category_id WHERE c.store_id = $1 ORDER BY p.sort_order, p.id`,
     [store.id],
   );
   const variants = rows.rows.length
@@ -218,6 +218,7 @@ export type ItemInput = {
   productType: Product["productType"];
   description: string;
   price?: string;
+  quantityUnit: Product["quantityUnit"];
   variants: { id?: string; label: string; price: string }[];
   addOnGroups: ProductAddonGroup[];
   orderQuestions: Product["orderQuestions"];
@@ -301,13 +302,14 @@ export async function importItems(
           )
         : item.price!;
       const result = await client.query<{ id: string }>(
-        `INSERT INTO products (category_id,name,product_type,description,price,image_url,is_available,sort_order)
-         VALUES ($1,$2,'PHYSICAL',$3,$4,NULL,$5,$6) RETURNING id`,
+        `INSERT INTO products (category_id,name,product_type,description,price,quantity_unit,image_url,is_available,sort_order)
+         VALUES ($1,$2,'PHYSICAL',$3,$4,$5,NULL,$6,$7) RETURNING id`,
         [
           category.id,
           item.name,
           item.description || null,
           price,
+          item.quantityUnit,
           item.isAvailable,
           category.nextItemOrder++,
         ],
@@ -343,13 +345,14 @@ export async function saveItem(
       input.productType,
       input.description || null,
       price,
+      input.quantityUnit,
       input.imageUrl || null,
       input.isAvailable,
       input.sortOrder,
     ];
     if (itemId) {
       const result = await client.query(
-        `UPDATE products SET category_id=$1,name=$2,product_type=$3,description=$4,price=$5,image_url=$6,is_available=$7,sort_order=$8,add_on_groups=$9::jsonb,order_questions=$10::jsonb WHERE id=$11 AND category_id IN (SELECT id FROM categories WHERE store_id=$12) RETURNING id`,
+        `UPDATE products SET category_id=$1,name=$2,product_type=$3,description=$4,price=$5,quantity_unit=$6,image_url=$7,is_available=$8,sort_order=$9,add_on_groups=$10::jsonb,order_questions=$11::jsonb WHERE id=$12 AND category_id IN (SELECT id FROM categories WHERE store_id=$13) RETURNING id`,
         [
           ...values,
           JSON.stringify(input.addOnGroups),
@@ -365,7 +368,7 @@ export async function saveItem(
     }
     const item = (
       await client.query<{ id: string }>(
-        `INSERT INTO products (category_id,name,product_type,description,price,image_url,is_available,sort_order,add_on_groups,order_questions) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb) RETURNING id`,
+        `INSERT INTO products (category_id,name,product_type,description,price,quantity_unit,image_url,is_available,sort_order,add_on_groups,order_questions) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb) RETURNING id`,
         [
           ...values,
           JSON.stringify(input.addOnGroups),

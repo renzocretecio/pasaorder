@@ -4,6 +4,7 @@ import { ArrowRight, ArrowUpRight, ShoppingBag } from "lucide-react";
 import type { OrderStatus, OwnerOrder, StoreOverview } from "@pasaorder/types";
 import { overviewDateRangeSchema } from "@pasaorder/validation";
 import { peso } from "@/features/catalog/color";
+import { quantityLabel } from "@/features/catalog/quantity";
 import { OverviewRefresh } from "@/features/orders/overview-refresh";
 import { OverviewDateRange } from "@/features/orders/overview-date-range";
 import { PageHeading } from "@/features/catalog/workspace";
@@ -62,7 +63,7 @@ function orderItems(order: OwnerOrder) {
   return order.items
     .map(
       (item) =>
-        `${item.quantity} × ${item.productName}${item.optionLabel ? ` (${item.optionLabel})` : ""}`,
+        `${quantityLabel(item.quantity, item.quantityUnit)} × ${item.productName}${item.optionLabel ? ` (${item.optionLabel})` : ""}`,
     )
     .join(" · ");
 }
