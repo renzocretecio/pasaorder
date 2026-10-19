@@ -112,14 +112,21 @@ export function WorkspaceNavigation({
       if (reason === "io server disconnect")
         reconnectTimer = window.setTimeout(() => socket.connect(), 0);
     });
-    const refreshWhenVisible = () => {
-      if (document.visibilityState === "visible") router.refresh();
+    let lastForegroundRefresh = 0;
+    const refreshWhenForegrounded = () => {
+      if (document.visibilityState !== "visible") return;
+      const now = Date.now();
+      if (now - lastForegroundRefresh < 1_000) return;
+      lastForegroundRefresh = now;
+      router.refresh();
     };
-    document.addEventListener("visibilitychange", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenForegrounded);
+    window.addEventListener("focus", refreshWhenForegrounded);
     socket.connect();
     return () => {
       window.clearTimeout(reconnectTimer);
-      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenForegrounded);
+      window.removeEventListener("focus", refreshWhenForegrounded);
       socket.disconnect();
     };
   }, [overview, reports, router, selectedStoreId]);
