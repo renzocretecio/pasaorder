@@ -165,7 +165,7 @@ export function MenuView({
     if (!item.isAvailable) return;
     setSelectedItem(item);
     setSelectedVariantId(startingVariant(item));
-    setQuantity(item.quantityUnit === "KG" ? 0.5 : 1);
+    setQuantity(1);
     setSelectedAddOns([]);
     setInstructions("");
     setAddedMessage("");
