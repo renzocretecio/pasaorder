@@ -966,6 +966,16 @@ export function OrdersBoard({
   useEffect(() => {
     let active = true;
     let liveConnected = false;
+    let syncTimer: number | undefined;
+    const scheduleSync = (intervalMs: number) => {
+      if (syncTimer !== undefined) window.clearInterval(syncTimer);
+      syncTimer = window.setInterval(() => {
+        if (active && document.visibilityState === "visible") router.refresh();
+      }, intervalMs);
+    };
+
+    // Keep the queue current while the socket is connecting or unavailable.
+    scheduleSync(10_000);
     const socket = io(getSocketUrl(), {
       auth: (callback) => {
         fetch("/api/socket-token", { cache: "no-store" })
@@ -984,6 +994,7 @@ export function OrdersBoard({
         if (!ok || !active) return;
         if (liveConnected) router.refresh();
         liveConnected = true;
+        scheduleSync(60_000);
         setLiveStatus("live");
         setAnnouncement("Live order updates connected.");
       });
@@ -996,15 +1007,21 @@ export function OrdersBoard({
     });
     socket.on("disconnect", (reason) => {
       liveConnected = false;
+      scheduleSync(10_000);
       setLiveStatus("reconnecting");
       if (reason === "io server disconnect") {
         window.setTimeout(() => socket.connect(), 0);
       }
     });
-    socket.on("connect_error", () => setLiveStatus("reconnecting"));
+    socket.on("connect_error", () => {
+      liveConnected = false;
+      scheduleSync(10_000);
+      setLiveStatus("reconnecting");
+    });
     socket.connect();
     return () => {
       active = false;
+      if (syncTimer !== undefined) window.clearInterval(syncTimer);
       socket.disconnect();
     };
   }, [router, storeId]);

@@ -50,4 +50,6 @@ pnpm test
 pnpm build
 ```
 
-SEO uses `WEB_ORIGIN` in `apps/web/.env` for canonical and sitemap URLs. The sitemap includes the landing and legal pages plus active, published store menus. Public menu links include store-specific metadata. In production, make the API's Socket.IO endpoint publicly reachable and set `NEXT_PUBLIC_SOCKET_URL` to its origin without `/api`.
+SEO uses `WEB_ORIGIN` in `apps/web/.env` for canonical and sitemap URLs. The sitemap includes the landing and legal pages plus active, published store menus. Public menu links include store-specific metadata. In production, Socket.IO can use the current site origin when the reverse proxy forwards `/socket.io/` to the API; set `NEXT_PUBLIC_SOCKET_URL` only when Socket.IO uses a separate public API origin.
+
+For uptime checks and production alerting, see [UptimeRobot monitoring](docs/uptime-monitoring.md).

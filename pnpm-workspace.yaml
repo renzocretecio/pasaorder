@@ -5,3 +5,4 @@ allowBuilds:
   bcrypt: false
   esbuild: false
   unrs-resolver: false
+  workerd: set this to true or false
