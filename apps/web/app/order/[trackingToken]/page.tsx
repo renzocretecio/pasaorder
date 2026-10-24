@@ -18,6 +18,7 @@ import { CustomerReadyAlert } from "@/features/notifications/customer-ready-aler
 import { CustomerOrderLiveUpdates } from "@/features/orders/customer-order-live-updates";
 import { orderTypeLabel } from "@/features/catalog/order-type-label";
 import { quantityLabel } from "@/features/catalog/quantity";
+import { CustomerOrderReceipt } from "@/features/orders/customer-order-receipt";
 
 export const metadata: Metadata = {
   title: "Order status | PasaOrder",
@@ -318,6 +319,8 @@ export default async function OrderTrackingPage({
               </p>
             )}
         </section>
+
+        <CustomerOrderReceipt order={order} storeName={order.storeName} />
 
         {order.status !== "READY" &&
           order.status !== "COMPLETED" &&

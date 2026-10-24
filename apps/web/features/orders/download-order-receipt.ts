@@ -1,5 +1,29 @@
 import type { OwnerOrder } from "@pasaorder/types";
 
+export type CustomerReceiptOrder = {
+  id: string;
+  status: string;
+  orderType: "DINE_IN" | "PICKUP" | "DELIVERY";
+  paymentMethod: "CASH" | "GCASH";
+  paymentStatus: "UNPAID" | "PAID";
+  itemsSubtotal: string;
+  total: string;
+  deliveryFee: string | null;
+  createdAt: string;
+  scheduledFor: string | null;
+  tableNumber: string | null;
+  formAnswers: { label: string; value: string }[];
+  items: {
+    productName: string;
+    optionLabel: string | null;
+    quantityUnit: "EACH" | "KG";
+    quantity: number;
+    subtotal: string;
+    addOns: { groupName: string; optionName: string; price: string }[];
+    productAnswers: { label: string; value: string }[];
+  }[];
+};
+
 type ReceiptLine = {
   label?: string;
   value?: string;
@@ -149,8 +173,7 @@ function receiptLines(storeName: string, order: OwnerOrder) {
   return lines;
 }
 
-function makeSvg(storeName: string, order: OwnerOrder) {
-  const lines = receiptLines(storeName, order);
+function makeSvgFromLines(lines: ReceiptLine[]) {
   const width = 1000;
   const padding = 64;
   const lineHeight = 46;
@@ -214,11 +237,90 @@ function makeSvg(storeName: string, order: OwnerOrder) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" fill="#f8faf7"/><rect x="24" y="24" width="${width - 48}" height="${height - 48}" rx="20" fill="#ffffff" stroke="#d6dfd6" stroke-width="2"/>${content.join("")}</svg>`;
 }
 
-export async function createOrderReceiptImage(
-  storeName: string,
-  order: OwnerOrder,
+function makeCustomerReceiptLines(order: CustomerReceiptOrder): ReceiptLine[] {
+  const placedAt = new Intl.DateTimeFormat("en-PH", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Manila",
+  }).format(new Date(order.createdAt));
+  const lines: ReceiptLine[] = [
+    { text: "PASAORDER · CUSTOMER RECEIPT", kind: "subtitle" },
+    { text: `Order #${order.id} · ${placedAt} (Philippine time)`, kind: "body" },
+    { label: "Order status", value: order.status.replaceAll("_", " ") },
+    {
+      label: "Fulfillment",
+      value: order.orderType.replaceAll("_", " "),
+    },
+  ];
+  if (order.tableNumber) lines.push({ label: "Table", value: order.tableNumber });
+  if (order.scheduledFor) {
+    lines.push({
+      label: "Requested for",
+      value: new Intl.DateTimeFormat("en-PH", {
+        dateStyle: "medium",
+        timeStyle: "short",
+        timeZone: "Asia/Manila",
+      }).format(new Date(order.scheduledFor)),
+    });
+  }
+  lines.push({ text: "ITEMS", kind: "section" });
+  for (const item of order.items) {
+    const quantity = new Intl.NumberFormat("en-PH", {
+      maximumFractionDigits: 3,
+    }).format(item.quantity);
+    const unit = item.quantityUnit === "KG" ? " kg" : "";
+    const option = item.optionLabel ? ` · ${item.optionLabel}` : "";
+    lines.push({
+      label: `${quantity}${unit} × ${item.productName}${option}`,
+      value: formatMoney(item.subtotal),
+    });
+    for (const addon of item.addOns) {
+      lines.push({
+        text: `   + ${addon.groupName}: ${addon.optionName} (${formatMoney(addon.price)})`,
+        kind: "muted",
+      });
+    }
+    for (const answer of item.productAnswers) {
+      lines.push({ text: `   ${answer.label}: ${answer.value}`, kind: "muted" });
+    }
+  }
+  for (const answer of order.formAnswers) {
+    lines.push({ label: answer.label, value: answer.value });
+  }
+  lines.push({ label: "Items subtotal", value: formatMoney(order.itemsSubtotal) });
+  if (order.orderType === "DELIVERY") {
+    lines.push({
+      label: "Delivery fee",
+      value:
+        order.deliveryFee === null
+          ? "To be confirmed"
+          : formatMoney(order.deliveryFee),
+    });
+  }
+  const totalToConfirm = order.orderType === "DELIVERY" && order.deliveryFee === null;
+  lines.push({
+    label: "TOTAL",
+    value: totalToConfirm ? "To be confirmed" : formatMoney(order.total),
+    kind: "total",
+  });
+  lines.push(
+    {
+      label: "Payment",
+      value: `${order.paymentMethod} · ${order.paymentStatus === "PAID" ? "Paid (verified by store)" : "Not yet verified"}`,
+    },
+    {
+      text: "This is an order receipt, not proof of payment. Payment is confirmed only when marked paid by the store.",
+      kind: "muted",
+    },
+  );
+  return lines;
+}
+
+async function createReceiptImage(
+  svgContent: string,
+  orderId: string,
 ): Promise<{ blob: Blob; fileName: string }> {
-  const svg = new Blob([makeSvg(storeName, order)], {
+  const svg = new Blob([svgContent], {
     type: "image/svg+xml;charset=utf-8",
   });
   const svgUrl = URL.createObjectURL(svg);
@@ -246,10 +348,33 @@ export async function createOrderReceiptImage(
         else reject(new Error("Could not create the receipt image."));
       }, "image/png");
     });
-    return { blob: png, fileName: `pasaorder-order-${order.id}-receipt.png` };
+    return { blob: png, fileName: `pasaorder-order-${orderId}-receipt.png` };
   } catch {
-    return { blob: svg, fileName: `pasaorder-order-${order.id}-receipt.svg` };
+    return { blob: svg, fileName: `pasaorder-order-${orderId}-receipt.svg` };
   } finally {
     URL.revokeObjectURL(svgUrl);
   }
+}
+
+export function createOrderReceiptImage(
+  storeName: string,
+  order: OwnerOrder,
+): Promise<{ blob: Blob; fileName: string }> {
+  return createReceiptImage(
+    makeSvgFromLines(receiptLines(storeName, order)),
+    order.id,
+  );
+}
+
+export function createCustomerOrderReceiptImage(
+  storeName: string,
+  order: CustomerReceiptOrder,
+): Promise<{ blob: Blob; fileName: string }> {
+  return createReceiptImage(
+    makeSvgFromLines([
+      { text: storeName, kind: "title" },
+      ...makeCustomerReceiptLines(order),
+    ]),
+    order.id,
+  );
 }

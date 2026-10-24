@@ -11,6 +11,8 @@ __pycache__/
 # Generated application and build output
 dist/
 .next/
+.open-next/
+.wrangler/
 out/
 build/
 coverage/
