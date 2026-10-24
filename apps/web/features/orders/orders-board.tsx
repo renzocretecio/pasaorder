@@ -4,7 +4,15 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { io } from "socket.io-client";
 import { Dialog } from "radix-ui";
-import { Check, ChevronDown, LoaderCircle, RefreshCw, X } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  Download,
+  LoaderCircle,
+  RefreshCw,
+  Receipt,
+  X,
+} from "lucide-react";
 import type {
   BusinessCategory,
   OrderStatus,
@@ -25,6 +33,7 @@ import {
   updateOrderStatus,
 } from "./actions";
 import { ManualOrderCreate } from "./manual-order-create";
+import { createOrderReceiptImage } from "./download-order-receipt";
 
 type Queue = "NEW" | "CONFIRMED" | "PREPARING" | "READY" | "HISTORY";
 type PaymentFilter = "ALL" | "UNPAID";
@@ -103,6 +112,14 @@ function formatPlacedAt(value: string) {
   });
 }
 
+function formatHistoryPlacedAt(value: string) {
+  return new Intl.DateTimeFormat("en-PH", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Manila",
+  }).format(new Date(value));
+}
+
 function formatScheduledFor(value: string) {
   return new Intl.DateTimeFormat("en-PH", {
     dateStyle: "medium",
@@ -173,17 +190,136 @@ function PaymentProofDialog({
   );
 }
 
+function OrderReceiptDialog({
+  order,
+  storeName,
+}: {
+  order: OwnerOrder;
+  storeName: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [preview, setPreview] = useState<{
+    url: string;
+    fileName: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const url = preview?.url;
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [preview?.url]);
+
+  async function showReceipt() {
+    setOpen(true);
+    setLoading(true);
+    setError("");
+    setPreview(null);
+    try {
+      const receipt = await createOrderReceiptImage(storeName, order);
+      setPreview({
+        url: URL.createObjectURL(receipt.blob),
+        fileName: receipt.fileName,
+      });
+    } catch {
+      setError("Could not create the receipt image. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Dialog.Root open={open} onOpenChange={setOpen}>
+      <Button
+        type="button"
+        variant="outline"
+        className="min-h-10 rounded-lg"
+        onClick={() => void showReceipt()}
+      >
+        <Receipt className="size-4" aria-hidden="true" />
+        View receipt
+      </Button>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/55 backdrop-blur-[2px]" />
+        <Dialog.Content className="fixed inset-x-0 bottom-0 z-50 flex max-h-[calc(100dvh-1rem)] flex-col overflow-hidden rounded-t-2xl border bg-card shadow-xl sm:inset-x-6 sm:top-1/2 sm:bottom-auto sm:mx-auto sm:max-h-[min(52rem,calc(100dvh-2rem))] sm:max-w-3xl sm:-translate-y-1/2 sm:rounded-2xl">
+          <div className="flex shrink-0 items-start justify-between gap-4 border-b px-5 py-4 sm:px-6">
+            <div className="min-w-0">
+              <Dialog.Title className="text-lg font-semibold tracking-[-0.02em]">
+                Order receipt · #{order.id}
+              </Dialog.Title>
+              <Dialog.Description className="mt-1 text-sm text-muted-foreground">
+                Preview the receipt image before downloading it.
+              </Dialog.Description>
+            </div>
+            <Dialog.Close asChild>
+              <button
+                type="button"
+                aria-label="Close order receipt"
+                className="grid size-11 shrink-0 place-items-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+              >
+                <X className="size-5" aria-hidden="true" />
+              </button>
+            </Dialog.Close>
+          </div>
+          <div className="min-h-0 flex-1 overflow-auto bg-muted/40 p-3 sm:p-5">
+            <div className="grid min-h-64 place-items-center rounded-xl border bg-background p-3 sm:min-h-96 sm:p-5">
+              {loading ? (
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+                  Preparing receipt…
+                </p>
+              ) : error ? (
+                <p role="alert" className="text-sm text-destructive">
+                  {error}
+                </p>
+              ) : preview ? (
+                // eslint-disable-next-line @next/next/no-img-element -- Locally generated receipt image preview.
+                <img
+                  src={preview.url}
+                  alt={`Order receipt for ${storeName}, order ${order.id}`}
+                  className="h-auto max-h-[65dvh] w-auto max-w-full object-contain"
+                />
+              ) : null}
+            </div>
+          </div>
+          <div className="flex shrink-0 justify-end gap-2 border-t px-5 py-4 sm:px-6">
+            <Dialog.Close asChild>
+              <Button type="button" variant="outline" className="min-h-11 rounded-lg">
+                Close
+              </Button>
+            </Dialog.Close>
+            {preview && (
+              <Button asChild className="min-h-11 rounded-lg">
+                <a href={preview.url} download={preview.fileName}>
+                  <Download className="size-4" aria-hidden="true" />
+                  Download image
+                </a>
+              </Button>
+            )}
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
 function OrderRow({
   order,
+  storeName,
   businessCategory,
   workflow,
+  isPastOrder = false,
   nextActionLabel,
   initialOpen,
   onSuccess,
 }: {
   order: OwnerOrder;
+  storeName: string;
   businessCategory: BusinessCategory;
   workflow: OrderWorkflow;
+  isPastOrder?: boolean;
   nextActionLabel?: string;
   initialOpen?: boolean;
   onSuccess: (message: string) => void;
@@ -201,6 +337,14 @@ function OrderRow({
   const router = useRouter();
   const labels = workflow.labels ?? defaultStatusLabel;
   const action = nextAction(order.status, labels);
+  const itemPreview = order.items
+    .slice(0, 2)
+    .map(
+      (item) =>
+        `${quantityLabel(item.quantity, item.quantityUnit)} ${item.productName}${item.optionLabel ? ` · ${item.optionLabel}` : ""}`,
+    )
+    .join(" · ");
+  const remainingItems = order.items.length - Math.min(order.items.length, 2);
   const deliveryPaymentWaitingForFee =
     order.paymentStatus === "UNPAID" &&
     order.orderType === "DELIVERY" &&
@@ -251,17 +395,22 @@ function OrderRow({
   const orderDetails = (
     <div className="mt-4 grid gap-x-6 gap-y-4 md:grid-cols-[minmax(0,3fr)_minmax(15rem,2fr)]">
       <div className="min-w-0">
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <p className="font-medium">{order.customerName}</p>
-          {order.customerPhone && (
-            <a
-              href={`tel:${order.customerPhone}`}
-              className="text-sm text-primary underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-ring"
-            >
-              {order.customerPhone}
-            </a>
-          )}
+        <div className="mb-3 flex justify-end">
+          <OrderReceiptDialog order={order} storeName={storeName} />
         </div>
+        {order.status === "NEW" && !isPastOrder && (
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <p className="font-medium">{order.customerName}</p>
+            {order.customerPhone && (
+              <a
+                href={`tel:${order.customerPhone}`}
+                className="text-sm text-primary underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-ring"
+              >
+                {order.customerPhone}
+              </a>
+            )}
+          </div>
+        )}
         {order.orderType === "DELIVERY" && order.deliveryAddress && (
           <p className="mt-1 break-words text-sm text-muted-foreground">
             {order.deliveryAddress}
@@ -278,16 +427,22 @@ function OrderRow({
           <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-lg py-2 text-sm font-medium text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring/40 [&::-webkit-details-marker]:hidden">
             <span>
               <span className="group-open:hidden">
-                {order.status === "NEW" ? "Items" : "Review"}{" "}
-                {order.items.length}{" "}
-                {order.items.length === 1 ? "item" : "items"}
-                {order.status !== "NEW" &&
-                (order.notes ||
-                  order.formAnswers?.length ||
-                  order.attachments.length ||
-                  order.items.some((item) => item.specialInstructions))
-                  ? " and notes"
-                  : ""}
+                {isPastOrder
+                  ? "View order details"
+                  : (
+                    <>
+                      {order.status === "NEW" ? "Items" : "Review"}{" "}
+                      {order.items.length}{" "}
+                      {order.items.length === 1 ? "item" : "items"}
+                      {order.status !== "NEW" &&
+                      (order.notes ||
+                        order.formAnswers?.length ||
+                        order.attachments.length ||
+                        order.items.some((item) => item.specialInstructions))
+                        ? " and notes"
+                        : ""}
+                    </>
+                  )}
               </span>
               <span className="hidden group-open:inline">
                 {order.status === "NEW"
@@ -593,7 +748,7 @@ function OrderRow({
               </div>
             )}
           </>
-        ) : (
+        ) : !isPastOrder ? (
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
             {order.status === "COMPLETED" ? (
               <Check className="size-4" aria-hidden="true" />
@@ -604,7 +759,7 @@ function OrderRow({
               ? `Order ${labels.COMPLETED.toLowerCase()}`
               : "Order cancelled"}
           </p>
-        )}
+        ) : null}
       </div>
     </div>
   );
@@ -614,8 +769,8 @@ function OrderRow({
       id={`order-${order.id}`}
       className="scroll-mt-28 rounded-xl border border-border bg-card px-4 py-4 transition-colors hover:border-primary/25 sm:px-5 sm:py-5"
     >
-      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
-        <div className="min-w-0 flex-1">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-4 gap-y-2">
+        <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
             <h2 className="text-base font-semibold tracking-[-0.01em]">
               Order #{order.id}
@@ -649,12 +804,57 @@ function OrderRow({
             <span className="mx-1" aria-hidden="true">
               ·
             </span>
-            {formatPlacedAt(order.createdAt)}
+            {isPastOrder
+              ? formatHistoryPlacedAt(order.createdAt)
+              : formatPlacedAt(order.createdAt)}
           </p>
         </div>
-        <p className="shrink-0 text-lg font-semibold tracking-[-0.02em] tabular-nums">
-          {peso(order.total)}
+        <div className="pt-0.5 text-right">
+          <p className="text-xs text-muted-foreground">Total</p>
+          <p className="mt-0.5 whitespace-nowrap text-lg font-semibold tracking-[-0.02em] tabular-nums">
+            {peso(order.total)}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border/70 pt-3">
+        <p className="min-w-0 basis-full truncate text-sm text-muted-foreground sm:flex-1">
+          <span className="font-medium text-foreground">
+            {order.items.length} {order.items.length === 1 ? "item" : "items"}
+          </span>
+          {itemPreview ? (
+            <>
+              <span className="mx-1.5" aria-hidden="true">
+                ·
+              </span>
+              {itemPreview}
+              {remainingItems > 0 && ` +${remainingItems} more`}
+            </>
+          ) : (
+            <span className="ml-1.5">· No item details</span>
+          )}
         </p>
+        <Badge
+          variant="outline"
+          aria-label={`Payment status: ${
+            order.paymentStatus === "PAID"
+              ? "paid"
+              : order.paymentProof
+                ? "proof received, not yet verified"
+                : "unpaid"
+          }`}
+          className={
+            order.paymentStatus === "PAID"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+              : "border-amber-200 bg-amber-50 text-amber-900"
+          }
+        >
+          {order.paymentStatus === "PAID"
+            ? "Paid"
+            : order.paymentProof
+              ? "Proof received"
+              : "Unpaid"}
+        </Badge>
       </div>
 
       {order.status === "NEW" ? (
@@ -670,15 +870,12 @@ function OrderRow({
             }
           }}
         >
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0 text-[13px] text-muted-foreground">
               <p>
                 <span className="font-medium text-foreground">
-                  {order.items.length}{" "}
-                  {order.items.length === 1 ? "item" : "items"}
+                  {order.paymentMethod === "GCASH" ? "GCash" : "Cash"}
                 </span>
-                <span aria-hidden="true"> · </span>
-                {order.paymentMethod === "GCASH" ? "GCash" : "Cash"}
                 {isDeliveryConfirmation && (
                   <>
                     <span aria-hidden="true"> · </span>
@@ -814,12 +1011,14 @@ function PaymentFilterBar({
 
 function HistoryQueue({
   storeId,
+  storeName,
   businessCategory,
   workflow,
   initialPage,
   onSuccess,
 }: {
   storeId: string;
+  storeName: string;
   businessCategory: BusinessCategory;
   workflow: OrderWorkflow;
   initialPage: PastOrdersPage;
@@ -883,8 +1082,10 @@ function HistoryQueue({
             <OrderRow
               key={order.id}
               order={order}
+              storeName={storeName}
               businessCategory={businessCategory}
               workflow={workflow}
+              isPastOrder
               onSuccess={onSuccess}
             />
           ))}
@@ -1144,6 +1345,7 @@ export function OrdersBoard({
         <HistoryQueue
           key={loadedAt}
           storeId={storeId}
+          storeName={catalog.store.name}
           businessCategory={catalog.store.businessCategory}
           workflow={workflow}
           initialPage={initialHistoryPage}
@@ -1171,6 +1373,7 @@ export function OrdersBoard({
                 <OrderRow
                   key={order.id}
                   order={order}
+                  storeName={catalog.store.name}
                   businessCategory={catalog.store.businessCategory}
                   initialOpen={
                     order.status === "NEW" && order.id === initialOrderId
