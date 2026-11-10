@@ -267,6 +267,189 @@
   font-size: 17px;
   line-height: 1.7;
 }
+.pricing {
+  padding: 0 clamp(22px, 4.5vw, 72px) clamp(76px, 9vw, 128px);
+  scroll-margin-top: 100px;
+}
+.pricingInner {
+  max-width: 1296px;
+  margin: auto;
+  display: grid;
+  gap: 34px;
+}
+.pricingIntro h2 {
+  max-width: 18ch;
+  margin: 0;
+  color: var(--forest);
+  font-size: clamp(38px, 4.2vw, 58px);
+  font-weight: 620;
+  line-height: 1.08;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+}
+.pricingIntro p {
+  max-width: 42ch;
+  margin: 22px 0 0;
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1.7;
+}
+.pricingGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 18px;
+}
+.pricingCard {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: clamp(24px, 3.2vw, 40px);
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+}
+.pricingCard:first-child {
+  background: var(--forest);
+  color: #fff;
+}
+.pricingCardPro {
+  background: #fff;
+}
+.pricingCardHeader {
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+.pricingCardHeader h3 {
+  margin: 0;
+  color: var(--forest);
+  font-size: 21px;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+}
+.pricingCard:first-child .pricingCardHeader h3 {
+  color: #fff;
+}
+.pricingCardHeader p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.pricingCard:first-child .pricingCardHeader p {
+  color: #e1eadf;
+}
+.pricingBadge {
+  flex: none;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: var(--lime);
+  color: var(--forest);
+  font-size: 12px;
+  font-weight: 650;
+}
+.pricingCardPro .pricingBadge {
+  background: #e9eee6;
+}
+.pricingPrice {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.pricingPrice strong {
+  color: var(--forest);
+  font-size: clamp(48px, 5vw, 64px);
+  font-weight: 620;
+  letter-spacing: -0.05em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.pricingCard:first-child .pricingPrice strong {
+  color: var(--lime);
+}
+.pricingCardPro .pricingPrice strong {
+  font-size: clamp(26px, 3vw, 34px);
+  letter-spacing: -0.035em;
+}
+.pricingPrice span {
+  color: var(--muted);
+  font-size: 15px;
+}
+.pricingCard:first-child .pricingPrice span {
+  color: #e1eadf;
+}
+.pricingList {
+  display: grid;
+  gap: 14px;
+  margin: 28px 0 0;
+  padding: 23px 0 0;
+  border-top: 1px solid var(--line);
+  list-style: none;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.pricingCard:first-child .pricingList {
+  border-top-color: rgb(255 255 255 / 22%);
+  color: #f1f5ef;
+}
+.pricingList li {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+.pricingList svg {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  margin-top: 2px;
+  color: var(--forest);
+}
+.pricingCard:first-child .pricingList svg {
+  color: var(--lime);
+}
+.pricingNote {
+  margin: 23px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.pricingCardPro .pricingNote {
+  margin-top: auto;
+  padding-top: 23px;
+}
+.pricingCta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 50px;
+  margin-top: 24px;
+  padding: 0 18px;
+  border-radius: 10px;
+  background: var(--lime);
+  color: var(--forest);
+  font-size: 14px;
+  font-weight: 650;
+  text-decoration: none;
+  transition: background-color 0.2s;
+  margin-top: auto;
+}
+.pricingCta:hover {
+  background: #fff;
+}
+.pricingCta svg {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.pricingCta:hover svg {
+  transform: translate(3px, -3px);
+}
 .steps {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -484,6 +667,13 @@
     padding: 40px 0 0;
     max-width: 62ch;
   }
+  .pricingInner {
+    grid-template-columns: 1fr;
+    gap: 35px;
+  }
+  .pricingIntro h2 {
+    max-width: 15ch;
+  }
   .menuCopy h2 {
     font-size: 40px;
   }
@@ -550,6 +740,9 @@
     grid-template-columns: 1fr;
     gap: 32px;
     margin-top: 40px;
+  }
+  .pricingGrid {
+    grid-template-columns: 1fr;
   }
   .step h3 {
     max-width: none;

@@ -1,5 +1,6 @@
 import type { Product } from "./product.js";
 import type { OrderType, OrderWorkflow, PaymentMethod } from "./order.js";
+
 export const weekdays = [
   "monday",
   "tuesday",

@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
-import { ChartNoAxesCombined, PackageCheck, ReceiptText } from "lucide-react";
-import type { StoreOverview } from "@pasaorder/types";
+import {
+  ArrowDownToLine,
+  ChartNoAxesCombined,
+  PackageCheck,
+  ReceiptText,
+} from "lucide-react";
+import type { OwnerEntitlements, StoreOverview } from "@pasaorder/types";
 import { overviewDateRangeSchema } from "@pasaorder/validation";
 import { peso } from "@/features/catalog/color";
 import { formatQuantity } from "@/features/catalog/quantity";
@@ -53,21 +58,31 @@ export default async function StoreReportsPage({
   const { from, to } = await searchParams;
   const hasDateSelection = from !== undefined || to !== undefined;
   const today = todayInManila();
-  const selectedRange = hasDateSelection
+  const requestedRange = hasDateSelection
     ? overviewDateRangeSchema.safeParse({ from, to })
     : {
         success: true as const,
         data: { from: shiftDate(today, -6), to: today },
       };
-  const rangeQuery = selectedRange.success
-    ? `?${new URLSearchParams(selectedRange.data)}`
-    : "";
-  const [{ store }, { overview }] = await Promise.all([
+  const [{ store }, plan] = await Promise.all([
     getOwnerCatalog(id),
-    ownerApi<{ overview: StoreOverview }>(
-      `/orders/stores/${id}/overview${rangeQuery}`,
-    ),
+    ownerApi<OwnerEntitlements>("/catalog/plan"),
   ]);
+  const rangeTooLong = Boolean(
+    requestedRange.success &&
+    (Date.parse(`${requestedRange.data.to}T00:00:00Z`) -
+      Date.parse(`${requestedRange.data.from}T00:00:00Z`)) /
+      86_400_000 +
+      1 >
+      plan.maxReportDays,
+  );
+  const rangeQuery =
+    requestedRange.success && !rangeTooLong
+      ? `?${new URLSearchParams(requestedRange.data)}`
+      : "";
+  const { overview } = await ownerApi<{ overview: StoreOverview }>(
+    `/orders/stores/${id}/overview${rangeQuery}`,
+  );
   const base = `/dashboard/stores/${id}`;
   return (
     <div className="space-y-7 pb-5 lg:space-y-8">
@@ -80,15 +95,34 @@ export default async function StoreReportsPage({
           to={overview.to}
           today={overview.date}
           basePath={`${base}/reports`}
+          maxDays={plan.maxReportDays}
         />
+        {plan.canExportReports ? (
+          <a
+            href={`/api/reports/stores/${id}?${new URLSearchParams({ from: overview.from, to: overview.to })}`}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border bg-card px-4 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            <ArrowDownToLine className="size-4" aria-hidden="true" />
+            Export CSV
+          </a>
+        ) : (
+          <a
+            href="/dashboard/plan"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border bg-card px-4 text-sm font-medium text-primary transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            Export CSV · Pro
+          </a>
+        )}
       </PageHeading>
 
       <OverviewRefresh />
 
-      {hasDateSelection && !selectedRange.success && (
+      {hasDateSelection && (!requestedRange.success || rangeTooLong) && (
         <p role="alert" className="text-sm text-destructive">
-          Choose a valid range with the start date on or before the end date.
-          Showing today.
+          {rangeTooLong
+            ? `Your ${plan.plan === "FREE" ? "Free" : "Pro"} plan includes up to ${plan.maxReportDays} days of report history.`
+            : "Choose a valid range with the start date on or before the end date."}{" "}
+          Showing the default period.
         </p>
       )}
 

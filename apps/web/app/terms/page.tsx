@@ -109,6 +109,22 @@ const sections: LegalSection[] = [
     ),
   },
   {
+    title: "PasaOrder plans and subscription payments",
+    content: (
+      <p>
+        PasaOrder offers Free and Pro account plans. Pro currently costs ₱299
+        per month and is paid by manual GCash transfer. You must submit the
+        transaction reference in your account, and the PasaOrder operator
+        reviews the payment before activating or extending Pro. Each approved
+        payment adds one month of Pro access. Payments do not renew
+        automatically. If a renewal is not approved by the end of the 7-day
+        grace period after a paid period, the account returns to Free limits.
+        Existing stores, products, and orders are not deleted when plan limits
+        change.
+      </p>
+    ),
+  },
+  {
     title: "Acceptable use",
     content: (
       <p>

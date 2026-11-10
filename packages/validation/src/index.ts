@@ -4,3 +4,4 @@ export * from "./order.js";
 export * from "./common.js";
 
 export * from "./catalog.js";
+export * from "./subscription.js";

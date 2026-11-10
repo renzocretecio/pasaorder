@@ -26,6 +26,9 @@ router.use(requireAuth);
 router.get("/stores", async (req, res) => {
   res.json({ stores: await repository.listCatalogStores(req.auth!.userId) });
 });
+router.get("/plan", async (req, res) => {
+  res.json(await repository.getOwnerEntitlements(req.auth!.userId));
+});
 router.post("/setup", async (req, res) => {
   res
     .status(201)

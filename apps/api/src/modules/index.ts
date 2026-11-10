@@ -8,6 +8,7 @@ import orderRoutes, { ownerOrdersRouter } from "./orders/orders.routes.js";
 import catalogRoutes, {
   publicCatalogRouter,
 } from "./catalog/catalog.routes.js";
+import billingRoutes from "./billing/billing.routes.js";
 
 const router = Router();
 router.use("/catalog", catalogRoutes);
@@ -18,5 +19,6 @@ router.use("/orders", ownerOrdersRouter);
 router.use("/auth", authRoutes);
 router.use("/images", imagesRoutes);
 router.use("/notifications", notificationsRoutes);
+router.use("/billing", billingRoutes);
 
 export default router;

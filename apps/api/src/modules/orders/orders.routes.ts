@@ -13,6 +13,7 @@ import {
 import { AppError } from "../../middleware/errors.js";
 import { requireAuth } from "../../middleware/auth.js";
 import * as repository from "./orders.repository.js";
+import * as catalogRepository from "../catalog/catalog.repository.js";
 import {
   emitCustomerOrderChanged,
   emitOrdersChanged,
@@ -53,6 +54,21 @@ ownerOrdersRouter.get("/stores/:storeId/overview", async (req, res) => {
           from: req.query.from,
           to: req.query.to,
         });
+  const entitlements = await catalogRepository.getOwnerEntitlements(
+    req.auth!.userId,
+  );
+  if (
+    range &&
+    (Date.parse(`${range.to}T00:00:00Z`) -
+      Date.parse(`${range.from}T00:00:00Z`)) /
+      86_400_000 +
+      1 >
+      entitlements.maxReportDays
+  )
+    throw new AppError(
+      403,
+      `Your ${entitlements.plan === "FREE" ? "Free" : "Pro"} plan includes up to ${entitlements.maxReportDays} days of report history.`,
+    );
   res.json({
     overview: await repository.getStoreOverview(
       req.auth!.userId,
@@ -60,6 +76,70 @@ ownerOrdersRouter.get("/stores/:storeId/overview", async (req, res) => {
       range,
     ),
   });
+});
+ownerOrdersRouter.get("/stores/:storeId/overview.csv", async (req, res) => {
+  const storeId = idSchema.parse(req.params.storeId);
+  const range = overviewDateRangeSchema.parse({
+    from: req.query.from,
+    to: req.query.to,
+  });
+  const entitlements = await catalogRepository.getOwnerEntitlements(
+    req.auth!.userId,
+  );
+  if (!entitlements.canExportReports)
+    throw new AppError(
+      403,
+      "CSV report exports are available on the Pro plan.",
+    );
+  const rangeDays =
+    (Date.parse(`${range.to}T00:00:00Z`) -
+      Date.parse(`${range.from}T00:00:00Z`)) /
+      86_400_000 +
+    1;
+  if (rangeDays > entitlements.maxReportDays)
+    throw new AppError(
+      403,
+      `Your Pro plan includes up to ${entitlements.maxReportDays} days of report history.`,
+    );
+  const overview = await repository.getStoreOverview(
+    req.auth!.userId,
+    storeId,
+    range,
+  );
+  const csvCell = (value: string | number) => {
+    const safe = String(value).replace(/^[=+@\-\t\r]/, "'$&");
+    return `"${safe.replaceAll('"', '""')}"`;
+  };
+  const rows: (string | number)[][] = [
+    ["PasaOrder sales report"],
+    ["From", overview.from],
+    ["To", overview.to],
+    [],
+    ["Summary", "Value"],
+    ["Completed-order sales", overview.sales],
+    ["Orders received", overview.ordersCount],
+    [],
+    ["Daily sales", "Date", "Sales"],
+    ...overview.salesTrend.map((day) => ["", day.date, day.sales]),
+    [],
+    ["Top products", "Product", "Units", "Unit", "Revenue"],
+    ...overview.topProducts.map((product) => [
+      "",
+      product.name,
+      product.units,
+      product.quantityUnit,
+      product.revenue,
+    ]),
+  ];
+  const content = `\uFEFF${rows.map((row) => row.map(csvCell).join(",")).join("\r\n")}\r\n`;
+  res
+    .set({
+      "Content-Type": "text/csv; charset=utf-8",
+      "Content-Disposition": `attachment; filename="pasaorder-report-${storeId}-${range.from}-${range.to}.csv"`,
+      "Cache-Control": "private, no-store",
+      "X-Content-Type-Options": "nosniff",
+    })
+    .send(content);
 });
 ownerOrdersRouter.get("/stores/:storeId/recent-orders", async (req, res) => {
   const storeId = idSchema.parse(req.params.storeId);

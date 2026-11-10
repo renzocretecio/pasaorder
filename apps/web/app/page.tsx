@@ -2,9 +2,13 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, ArrowUpRight, Check, QrCode } from "lucide-react";
+import { OWNER_PLAN_ENTITLEMENTS } from "@pasaorder/types";
 import { Brand } from "@/components/brand";
 import s from "./landing.module.css";
 import { LandingMotion } from "@/features/landing/landing-motion";
+
+const freePlan = OWNER_PLAN_ENTITLEMENTS.FREE;
+const proPlan = OWNER_PLAN_ENTITLEMENTS.PRO;
 
 export const metadata: Metadata = {
   title: "PasaOrder | Orders made simple, from catalog to checkout",
@@ -70,6 +74,7 @@ export default function Home() {
             <nav className={s.desktopNav} aria-label="Main navigation">
               <a href="#how-it-works">How it works</a>
               <a href="#for-your-store">For your store</a>
+              <a href="#pricing">Pricing</a>
             </nav>
             <div className={s.headerActions}>
               <Link href="/login" className={s.signIn}>
@@ -207,6 +212,97 @@ export default function Home() {
                   options with simple order notes
                 </li>
               </ul>
+            </div>
+          </section>
+
+          <section
+            id="pricing"
+            className={s.pricing}
+            aria-labelledby="pricing-title"
+          >
+            <div className={s.pricingInner}>
+              <div className={s.pricingIntro} data-reveal>
+                <h2 id="pricing-title">Simple plans for your next step.</h2>
+                <p>
+                  Start free, then move to Pro when your business needs more
+                  stores, a larger catalog, and downloadable reports.
+                </p>
+              </div>
+              <div className={s.pricingGrid}>
+                <article className={s.pricingCard}>
+                  <div className={s.pricingCardHeader}>
+                    <div>
+                      <h3>Free beta</h3>
+                      <p>Everything to start taking orders.</p>
+                    </div>
+                    <span className={s.pricingBadge}>Available</span>
+                  </div>
+                  <div className={s.pricingPrice}>
+                    <strong>₱0</strong>
+                    <span>during beta</span>
+                  </div>
+                  <ul className={s.pricingList}>
+                    <li>
+                      <Check aria-hidden="true" /> {freePlan.maxStores} store
+                    </li>
+                    <li>
+                      <Check aria-hidden="true" /> Up to{" "}
+                      {freePlan.maxActiveProducts} active products
+                    </li>
+                    <li>
+                      <Check aria-hidden="true" /> {freePlan.maxReportDays} days
+                      of sales reports
+                    </li>
+                    <li>
+                      <Check aria-hidden="true" /> Guest checkout and order
+                      management
+                    </li>
+                  </ul>
+                  <Link href="/register" className={s.pricingCta}>
+                    Join the free beta{" "}
+                    <ArrowUpRight aria-hidden="true" size={18} />
+                  </Link>
+                </article>
+                <article className={`${s.pricingCard} ${s.pricingCardPro}`}>
+                  <div className={s.pricingCardHeader}>
+                    <div>
+                      <h3>Pro</h3>
+                      <p>More room as your business grows.</p>
+                    </div>
+                    <span className={s.pricingBadge}>Manual renewal</span>
+                  </div>
+                  <div className={s.pricingPrice}>
+                    <strong>₱299</strong>
+                    <span>per month</span>
+                  </div>
+                  <ul className={s.pricingList}>
+                    <li>
+                      <Check aria-hidden="true" /> Up to {proPlan.maxStores}{" "}
+                      stores
+                    </li>
+                    <li>
+                      <Check aria-hidden="true" />{" "}
+                      {proPlan.maxActiveProducts === null
+                        ? "Unlimited active products"
+                        : `Up to ${proPlan.maxActiveProducts} active products per store`}
+                    </li>
+                    <li>
+                      <Check aria-hidden="true" /> {proPlan.maxReportDays} days
+                      of sales reports
+                    </li>
+                    <li>
+                      <Check aria-hidden="true" />{" "}
+                      {proPlan.canExportReports
+                        ? "Download reports as CSV"
+                        : "CSV exports not included"}
+                    </li>
+                  </ul>
+                  <p className={s.pricingNote}>
+                    Pay by GCash. Each payment is reviewed manually before Pro
+                    is activated or extended. No automatic charges.
+                  </p>
+                </article>
+              </div>
             </div>
           </section>
 

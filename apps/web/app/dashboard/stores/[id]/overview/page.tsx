@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, ArrowUpRight, ShoppingBag } from "lucide-react";
 import type { OrderStatus, OwnerOrder, StoreOverview } from "@pasaorder/types";
+import type { OwnerEntitlements } from "@pasaorder/types";
 import { overviewDateRangeSchema } from "@pasaorder/validation";
 import { peso } from "@/features/catalog/color";
 import { quantityLabel } from "@/features/catalog/quantity";
@@ -88,14 +89,26 @@ export default async function StoreOverviewPage({
   const { id } = await params;
   const { from, to } = await searchParams;
   const hasDateSelection = from !== undefined || to !== undefined;
-  const selectedRange = hasDateSelection
+  const requestedRange = hasDateSelection
     ? overviewDateRangeSchema.safeParse({ from, to })
     : null;
-  const rangeQuery = selectedRange?.success
-    ? `?${new URLSearchParams(selectedRange.data)}`
-    : "";
-  const [{ store }, { overview }, { orders }] = await Promise.all([
+  const [{ store }, plan] = await Promise.all([
     getOwnerCatalog(id),
+    ownerApi<OwnerEntitlements>("/catalog/plan"),
+  ]);
+  const rangeTooLong = Boolean(
+    requestedRange?.success &&
+    (Date.parse(`${requestedRange.data.to}T00:00:00Z`) -
+      Date.parse(`${requestedRange.data.from}T00:00:00Z`)) /
+      86_400_000 +
+      1 >
+      plan.maxReportDays,
+  );
+  const rangeQuery =
+    requestedRange?.success && !rangeTooLong
+      ? `?${new URLSearchParams(requestedRange.data)}`
+      : "";
+  const [{ overview }, { orders }] = await Promise.all([
     ownerApi<{ overview: StoreOverview }>(
       `/orders/stores/${id}/overview${rangeQuery}`,
     ),
@@ -126,6 +139,7 @@ export default async function StoreOverviewPage({
             to={overview.to}
             today={overview.date}
             basePath={`${base}/overview`}
+            maxDays={plan.maxReportDays}
           />
           <Link
             href={`${base}/orders`}
@@ -139,10 +153,12 @@ export default async function StoreOverviewPage({
       <OverviewRefresh />
 
       <section aria-labelledby="kpi-range-title" className="space-y-3">
-        {hasDateSelection && !selectedRange?.success && (
+        {hasDateSelection && (!requestedRange?.success || rangeTooLong) && (
           <p role="alert" className="text-sm text-destructive">
-            Choose a valid range with the start date on or before the end date.
-            Showing today.
+            {rangeTooLong
+              ? `Your ${plan.plan === "FREE" ? "Free" : "Pro"} plan includes up to ${plan.maxReportDays} days of report history.`
+              : "Choose a valid range with the start date on or before the end date."}{" "}
+            Showing the default period.
           </p>
         )}
       </section>

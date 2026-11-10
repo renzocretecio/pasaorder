@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { requireUser } from "@/lib/auth";
-import type { WorkspaceStore } from "@pasaorder/types";
+import type { OwnerEntitlements, WorkspaceStore } from "@pasaorder/types";
 import { ownerApi } from "@/lib/catalog";
 import { WorkspaceNavigation } from "@/features/catalog/workspace-navigation";
 
@@ -15,9 +15,10 @@ export default async function WorkspaceLayout({
   children: ReactNode;
 }) {
   const user = await requireUser();
-  const { stores } = await ownerApi<{ stores: WorkspaceStore[] }>(
-    "/catalog/stores",
-  );
+  const [{ stores }, plan] = await Promise.all([
+    ownerApi<{ stores: WorkspaceStore[] }>("/catalog/stores"),
+    ownerApi<OwnerEntitlements>("/catalog/plan"),
+  ]);
   return (
     <div className="merchant-theme min-h-dvh bg-background text-foreground md:grid md:grid-cols-[88px_minmax(0,1fr)] md:grid-rows-[auto_1fr] xl:grid-cols-[216px_minmax(0,1fr)]">
       <a
@@ -30,6 +31,7 @@ export default async function WorkspaceLayout({
         name={user.name}
         email={user.email}
         stores={stores}
+        plan={plan}
       />
       <main
         id="main-content"

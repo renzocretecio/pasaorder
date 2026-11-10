@@ -17,6 +17,7 @@ export async function previewProductImport(data: FormData) {
     return {
       success: true as const,
       count: parsed.items.length,
+      activeCount: parsed.items.filter((item) => item.isAvailable).length,
       sample: parsed.items.slice(0, 50),
     };
   } catch (error) {

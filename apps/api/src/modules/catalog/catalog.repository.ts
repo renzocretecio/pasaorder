@@ -8,10 +8,14 @@ import type {
   ProductAddonGroup,
   StoreOrderQuestion,
   WorkspaceStore,
+  OwnerPlan,
+  OwnerEntitlements,
 } from "@pasaorder/types";
+import { OWNER_PLAN_ENTITLEMENTS } from "@pasaorder/types";
 import type { CatalogImportInput } from "@pasaorder/validation";
 import { pool } from "../../db.js";
 import { AppError } from "../../middleware/errors.js";
+import { syncOwnerSubscription } from "../billing/billing.repository.js";
 const storeFields = `s.id, s.name, s.business_category AS "businessCategory", s.slug, s.description, s.contact_phone AS "contactPhone", s.address, s.operating_hours AS "operatingHours", s.order_types AS "orderTypes", s.payment_methods AS "paymentMethods", s.gcash_account_name AS "gcashAccountName", s.gcash_number AS "gcashNumber", s.gcash_qr_url AS "gcashQrUrl", s.logo_url AS "logoUrl", s.banner_url AS "bannerUrl", s.is_active AS "isActive", s.is_published AS "isPublished", s.accent_color AS "accentColor", s.order_questions AS "orderQuestions", s.order_workflow AS "orderWorkflow"`;
 export async function transaction<T>(work: (client: PoolClient) => Promise<T>) {
   const client = await pool.connect();
@@ -46,6 +50,19 @@ export async function listCatalogStores(ownerId: string) {
       [ownerId],
     )
   ).rows;
+}
+export async function getOwnerEntitlements(
+  ownerId: string,
+): Promise<OwnerEntitlements> {
+  return transaction(async (client) => {
+    await syncOwnerSubscription(client, ownerId);
+    const result = await client.query<{ plan: OwnerPlan }>(
+      "SELECT plan FROM users WHERE id = $1",
+      [ownerId],
+    );
+    const plan = result.rows[0]?.plan ?? "FREE";
+    return OWNER_PLAN_ENTITLEMENTS[plan];
+  });
 }
 export async function listPublishedStoreSlugs() {
   return (
@@ -126,30 +143,52 @@ export async function setupStore(
   },
   ownerId: string,
 ) {
-  const store = await pool.query<{ id: string }>(
-    `WITH new_store AS (INSERT INTO stores (owner_id, name, business_category, slug, description, logo_url, accent_color, contact_phone, address, operating_hours, order_types, banner_url, payment_methods, gcash_account_name, gcash_number, gcash_qr_url, order_questions, order_workflow, is_published) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13::jsonb,$14,$15,$16,$17::jsonb,$18::jsonb,false) RETURNING id), default_preference AS (INSERT INTO owner_preferences (owner_id, default_store_id) SELECT $1, id FROM new_store ON CONFLICT (owner_id) DO NOTHING RETURNING owner_id) SELECT id FROM new_store`,
-    [
-      ownerId,
-      input.name,
-      input.businessCategory,
-      input.slug,
-      input.description || null,
-      input.logoUrl || null,
-      input.accentColor,
-      input.contactPhone || null,
-      input.address || null,
-      input.operatingHours ? JSON.stringify(input.operatingHours) : null,
-      JSON.stringify(input.orderTypes),
-      input.bannerUrl || null,
-      JSON.stringify(input.paymentMethods),
-      input.paymentMethods.includes("GCASH") ? input.gcashAccountName : null,
-      input.paymentMethods.includes("GCASH") ? input.gcashNumber : null,
-      input.paymentMethods.includes("GCASH") ? input.gcashQrUrl || null : null,
-      JSON.stringify(input.orderQuestions),
-      JSON.stringify(input.orderWorkflow),
-    ],
-  );
-  return { id: store.rows[0].id };
+  return transaction(async (client) => {
+    await syncOwnerSubscription(client, ownerId);
+    const planResult = await client.query<{ plan: OwnerPlan }>(
+      "SELECT plan FROM users WHERE id = $1 FOR UPDATE",
+      [ownerId],
+    );
+    const plan = planResult.rows[0]?.plan ?? "FREE";
+    const entitlements = OWNER_PLAN_ENTITLEMENTS[plan];
+    if (entitlements.maxStores !== null) {
+      const { rows } = await client.query<{ count: string }>(
+        "SELECT COUNT(*)::text AS count FROM stores WHERE owner_id = $1",
+        [ownerId],
+      );
+      if (Number(rows[0]?.count ?? 0) >= entitlements.maxStores)
+        throw new AppError(
+          409,
+          `The ${plan === "FREE" ? "Free" : "Pro"} plan allows up to ${entitlements.maxStores} stores.`,
+        );
+    }
+    const store = await client.query<{ id: string }>(
+      `WITH new_store AS (INSERT INTO stores (owner_id, name, business_category, slug, description, logo_url, accent_color, contact_phone, address, operating_hours, order_types, banner_url, payment_methods, gcash_account_name, gcash_number, gcash_qr_url, order_questions, order_workflow, is_published) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13::jsonb,$14,$15,$16,$17::jsonb,$18::jsonb,false) RETURNING id), default_preference AS (INSERT INTO owner_preferences (owner_id, default_store_id) SELECT $1, id FROM new_store ON CONFLICT (owner_id) DO NOTHING RETURNING owner_id) SELECT id FROM new_store`,
+      [
+        ownerId,
+        input.name,
+        input.businessCategory,
+        input.slug,
+        input.description || null,
+        input.logoUrl || null,
+        input.accentColor,
+        input.contactPhone || null,
+        input.address || null,
+        input.operatingHours ? JSON.stringify(input.operatingHours) : null,
+        JSON.stringify(input.orderTypes),
+        input.bannerUrl || null,
+        JSON.stringify(input.paymentMethods),
+        input.paymentMethods.includes("GCASH") ? input.gcashAccountName : null,
+        input.paymentMethods.includes("GCASH") ? input.gcashNumber : null,
+        input.paymentMethods.includes("GCASH")
+          ? input.gcashQrUrl || null
+          : null,
+        JSON.stringify(input.orderQuestions),
+        JSON.stringify(input.orderWorkflow),
+      ],
+    );
+    return { id: store.rows[0].id };
+  });
 }
 
 export async function setDefaultStore(storeId: string, ownerId: string) {
@@ -226,6 +265,42 @@ export type ItemInput = {
   isAvailable: boolean;
   sortOrder: number;
 };
+
+async function ensureActiveProductCapacity(
+  client: PoolClient,
+  storeId: string,
+  additionalActiveItems: number,
+) {
+  if (additionalActiveItems <= 0) return;
+  const owner = await client.query<{ ownerId: string }>(
+    "SELECT s.owner_id AS \"ownerId\" FROM stores s WHERE s.id = $1",
+    [storeId],
+  );
+  if (!owner.rows[0]) throw new AppError(404, "Store not found");
+  await syncOwnerSubscription(client, owner.rows[0].ownerId);
+  const planResult = await client.query<{ plan: OwnerPlan }>(
+    "SELECT plan FROM users WHERE id=$1",
+    [owner.rows[0].ownerId],
+  );
+  const limit =
+    OWNER_PLAN_ENTITLEMENTS[planResult.rows[0]?.plan ?? "FREE"]
+      .maxActiveProducts;
+  if (limit === null) return;
+  const result = await client.query<{ count: string }>(
+    `SELECT COUNT(*)::text AS count
+     FROM products p JOIN categories c ON c.id = p.category_id
+     WHERE c.store_id = $1 AND p.is_available = true`,
+    [storeId],
+  );
+  const activeCount = Number(result.rows[0]?.count ?? 0);
+  if (activeCount + additionalActiveItems > limit) {
+    throw new AppError(
+      409,
+      `This store has reached the Free plan limit of ${limit} active items. Mark an item unavailable to add another.`,
+    );
+  }
+}
+
 export async function importItems(
   storeId: string,
   input: CatalogImportInput,
@@ -233,6 +308,11 @@ export async function importItems(
 ) {
   return transaction(async (client) => {
     await ownedStore(client, storeId, ownerId);
+    await ensureActiveProductCapacity(
+      client,
+      storeId,
+      input.items.filter((item) => item.isAvailable).length,
+    );
     const existingCategories = await client.query<{
       id: string;
       name: string;
@@ -351,6 +431,15 @@ export async function saveItem(
       input.sortOrder,
     ];
     if (itemId) {
+      const existing = await client.query<{ isAvailable: boolean }>(
+        `SELECT p.is_available AS "isAvailable"
+         FROM products p JOIN categories c ON c.id = p.category_id
+         WHERE p.id = $1 AND c.store_id = $2 FOR UPDATE OF p`,
+        [itemId, id],
+      );
+      if (!existing.rows[0]) throw new AppError(404, "Item not found");
+      if (!existing.rows[0].isAvailable && input.isAvailable)
+        await ensureActiveProductCapacity(client, id, 1);
       const result = await client.query(
         `UPDATE products SET category_id=$1,name=$2,product_type=$3,description=$4,price=$5,quantity_unit=$6,image_url=$7,is_available=$8,sort_order=$9,add_on_groups=$10::jsonb,order_questions=$11::jsonb WHERE id=$12 AND category_id IN (SELECT id FROM categories WHERE store_id=$13) RETURNING id`,
         [
@@ -366,6 +455,7 @@ export async function saveItem(
       if (!input.isAvailable) await unpublishIfEmpty(client, id);
       return result.rows[0];
     }
+    if (input.isAvailable) await ensureActiveProductCapacity(client, id, 1);
     const item = (
       await client.query<{ id: string }>(
         `INSERT INTO products (category_id,name,product_type,description,price,quantity_unit,image_url,is_available,sort_order,add_on_groups,order_questions) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb) RETURNING id`,

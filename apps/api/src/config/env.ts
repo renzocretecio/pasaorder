@@ -44,6 +44,7 @@ export const envSchema = z
     VAPID_PUBLIC_KEY: z.string().min(1).optional(),
     VAPID_PRIVATE_KEY: z.string().min(1).optional(),
     VAPID_SUBJECT: z.string().url().optional(),
+    SUBSCRIPTION_ADMIN_EMAILS: z.string().optional(),
   })
   .superRefine((values, context) => {
     const googleValues = [

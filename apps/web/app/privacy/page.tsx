@@ -52,6 +52,14 @@ const sections: LegalSection[] = [
           subscription after the ready alert or when its endpoint expires.
         </p>
         <p>
+          If a store owner subscribes to Pro, we store the GCash transaction
+          reference, payment amount, submission and review times, payment
+          status, and any rejection reason so the operator can verify and manage
+          the subscription. Do not submit an MPIN, one-time password, password,
+          or payment card details. PasaOrder does not receive GCash login
+          credentials and does not automatically charge renewals.
+        </p>
+        <p>
           We also receive technical information needed to operate and protect
           the service, such as request, device, and diagnostic data. Customers
           may place catalog orders without creating an account. Their cart

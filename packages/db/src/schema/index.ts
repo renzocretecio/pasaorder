@@ -31,6 +31,17 @@ export const orderTypeEnum = pgEnum("order_type", [
 ]);
 export const paymentMethodEnum = pgEnum("payment_method", ["CASH", "GCASH"]);
 export const paymentStatusEnum = pgEnum("payment_status", ["UNPAID", "PAID"]);
+export const ownerPlanEnum = pgEnum("owner_plan", ["FREE", "PRO"]);
+export const ownerSubscriptionStatusEnum = pgEnum("owner_subscription_status", [
+  "PENDING",
+  "ACTIVE",
+  "PAST_DUE",
+  "EXPIRED",
+]);
+export const ownerSubscriptionPaymentStatusEnum = pgEnum(
+  "owner_subscription_payment_status",
+  ["PENDING", "APPROVED", "REJECTED"],
+);
 export const orderSourceEnum = pgEnum("order_source", [
   "MENU",
   "MANUAL",
@@ -45,6 +56,7 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash"),
   googleSub: varchar("google_sub", { length: 255 }).unique(),
   tokenVersion: integer("token_version").notNull().default(0),
+  plan: ownerPlanEnum("plan").notNull().default("FREE"),
   name: varchar("name", { length: 255 }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
@@ -134,6 +146,61 @@ export const ownerPreferences = pgTable("owner_preferences", {
     { onDelete: "set null" },
   ),
 });
+
+export const ownerSubscriptions = pgTable("owner_subscriptions", {
+  ownerId: bigint("owner_id", { mode: "bigint" })
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  status: ownerSubscriptionStatusEnum("status").notNull().default("PENDING"),
+  periodStart: timestamp("period_start", { withTimezone: true }),
+  periodEnd: timestamp("period_end", { withTimezone: true }),
+  gracePeriodEnd: timestamp("grace_period_end", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const ownerSubscriptionPayments = pgTable(
+  "owner_subscription_payments",
+  {
+    id: bigint("id", { mode: "bigint" })
+      .primaryKey()
+      .generatedAlwaysAsIdentity(),
+    ownerId: bigint("owner_id", { mode: "bigint" })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    gcashReference: varchar("gcash_reference", { length: 80 }).notNull(),
+    amountMinor: integer("amount_minor").notNull(),
+    status: ownerSubscriptionPaymentStatusEnum("status")
+      .notNull()
+      .default("PENDING"),
+    submittedAt: timestamp("submitted_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    reviewedBy: bigint("reviewed_by", { mode: "bigint" }).references(
+      () => users.id,
+      { onDelete: "set null" },
+    ),
+    rejectionReason: varchar("rejection_reason", { length: 500 }),
+  },
+  (table) => [
+    uniqueIndex("owner_subscription_payments_reference_unique").on(
+      table.gcashReference,
+    ),
+    index("owner_subscription_payments_status_submitted_idx").on(
+      table.status,
+      table.submittedAt,
+    ),
+    index("owner_subscription_payments_owner_submitted_idx").on(
+      table.ownerId,
+      table.submittedAt,
+    ),
+  ],
+);
 
 export const categories = pgTable("categories", {
   id: bigint("id", { mode: "bigint" }).primaryKey().generatedAlwaysAsIdentity(),

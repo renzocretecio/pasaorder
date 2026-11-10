@@ -12,11 +12,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { previewProductImport, saveProductImport } from "./import-actions";
 
-export function ProductImport({ storeId }: { storeId: string }) {
+export function ProductImport({
+  storeId,
+  remainingActiveItemSlots,
+  maxActiveProducts,
+}: {
+  storeId: string;
+  remainingActiveItemSlots: number | null;
+  maxActiveProducts: number | null;
+}) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [previewData, setPreviewData] = useState<{
     count: number;
+    activeCount: number;
     sample: CatalogImportInput["items"];
   } | null>(null);
   const [fileName, setFileName] = useState("");
@@ -38,7 +47,11 @@ export function ProductImport({ storeId }: { storeId: string }) {
     startTransition(async () => {
       const result = await previewProductImport(data);
       if (result.success)
-        setPreviewData({ count: result.count, sample: result.sample });
+        setPreviewData({
+          count: result.count,
+          activeCount: result.activeCount,
+          sample: result.sample,
+        });
       else setMessage(result.message);
       setStage(null);
     });
@@ -126,6 +139,12 @@ export function ProductImport({ storeId }: { storeId: string }) {
         )}
       </div>
 
+      <p className="text-[13px] leading-relaxed text-muted-foreground">
+        {maxActiveProducts === null
+          ? "Pro plan: no active item limit."
+          : `Free plan: up to ${maxActiveProducts} active items per store. Unavailable items don’t count toward this limit.`}
+      </p>
+
       <Button
         type="button"
         variant="outline"
@@ -165,6 +184,29 @@ export function ProductImport({ storeId }: { storeId: string }) {
               reused. If any name already exists in its category, the import
               stops without adding products.
             </p>
+            {remainingActiveItemSlots !== null &&
+              previewData.activeCount > remainingActiveItemSlots && (
+                <p role="alert" className="mt-3 text-sm text-destructive">
+                  This workbook has {previewData.activeCount} available items,
+                  but only {remainingActiveItemSlots} active
+                  {remainingActiveItemSlots === 1
+                    ? " slot is"
+                    : " slots are"}{" "}
+                  left. Mark extra items as unavailable in the workbook or free
+                  up active slots before importing.
+                </p>
+              )}
+            {remainingActiveItemSlots !== null &&
+              previewData.activeCount <= remainingActiveItemSlots && (
+                <p className="mt-2 text-[13px] text-muted-foreground">
+                  This import will add {previewData.activeCount} active items;{" "}
+                  {remainingActiveItemSlots - previewData.activeCount} active{" "}
+                  {remainingActiveItemSlots - previewData.activeCount === 1
+                    ? "slot will"
+                    : "slots will"}{" "}
+                  remain afterward.
+                </p>
+              )}
             {previewData.count > previewData.sample.length && (
               <p className="mt-1 text-[13px] text-muted-foreground">
                 Showing the first {previewData.sample.length} products below.
@@ -207,7 +249,11 @@ export function ProductImport({ storeId }: { storeId: string }) {
               type="button"
               className="h-12 rounded-xl"
               onClick={save}
-              disabled={pending}
+              disabled={
+                pending ||
+                (remainingActiveItemSlots !== null &&
+                  previewData.activeCount > remainingActiveItemSlots)
+              }
             >
               {pending && stage === "import"
                 ? "Importing…"

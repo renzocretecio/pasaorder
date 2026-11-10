@@ -37,7 +37,7 @@ The product connects a store's public QR/link ordering flow with its order works
 - Pickup, delivery, and dine-in are the selected first-release order types.
 - GCash copyable details and an optional downloadable QR are manual payment instructions. Store owners verify payment from their GCash account and update the order; automatic payment confirmation or a payment gateway has not been decided.
 - Customer chat ordering, Messenger/Instagram integrations, AI classification, and chat order extraction are out of the current MVP. Their product surfaces and active routes are disabled; historical chat and integration records may remain in the database but are not available through the current app.
-- Customer research, subscription terms, and pricing have not been established.
+- Account plans are enforced by the API. Free includes one store, 50 active products per store, up to 30 days of sales-report history, and no report export. Pro is ₱299/month and includes up to three stores, unlimited active products, up to 365 days of report history, and CSV exports. Owners submit a manual payment reference number for operator review; approved payments activate or extend Pro by one month. There is no automatic renewal. Pro stays available during a 7-day grace period after expiration, then the account returns to Free limits. Existing data is retained. Unavailable products do not count toward the Free product limit. Billing administrator emails are configured in the API environment.
 
 ## Brand Commitments
 

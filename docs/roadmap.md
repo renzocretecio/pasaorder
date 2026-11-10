@@ -60,6 +60,14 @@ Completed items are checked. Unchecked items are not part of the current product
 - [x] Customize storefront appearance
 - [x] Manage business contact information
 
+## 8. Plans and reporting
+
+- [x] Enforce Free and Pro store limits in the API
+- [x] Enforce per-plan active product limits
+- [x] Limit report history by plan
+- [x] Export Pro sales reports as CSV
+- [x] Add manual GCash subscription requests, operator review, and plan expiry/grace handling
+
 ## Features to leave out for now
 
 - Chat-to-Order and Meta messaging integrations

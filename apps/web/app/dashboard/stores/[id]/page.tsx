@@ -5,13 +5,18 @@ import { Button } from "@/components/ui/button";
 import { PageHeading } from "@/features/catalog/workspace";
 import { PublishPanel } from "@/features/catalog/forms";
 import { CatalogOrder } from "@/features/catalog/catalog-order";
+import type { OwnerEntitlements } from "@pasaorder/types";
+import { ownerApi } from "@/lib/catalog";
 export default async function StoreCatalog({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { store, categories } = await getOwnerCatalog(id);
+  const [{ store, categories }, plan] = await Promise.all([
+    getOwnerCatalog(id),
+    ownerApi<OwnerEntitlements>("/catalog/plan"),
+  ]);
   const base = `/dashboard/stores/${id}`;
   const items = categories.flatMap((c) => c.items);
   const available = items.filter((i) => i.isAvailable).length;
@@ -40,7 +45,12 @@ export default async function StoreCatalog({
           categoryCount={categories.length}
           available={available}
         />
-        <CatalogOrder storeId={id} categories={categories} />
+        <CatalogOrder
+          storeId={id}
+          categories={categories}
+          activeItemCount={available}
+          maxActiveProducts={plan.maxActiveProducts}
+        />
       </div>
     </>
   );

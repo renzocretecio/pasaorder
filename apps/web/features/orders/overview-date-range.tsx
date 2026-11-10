@@ -70,11 +70,13 @@ export function OverviewDateRange({
   to,
   today,
   basePath,
+  maxDays = 365,
 }: {
   from: string;
   to: string;
   today: string;
   basePath: string;
+  maxDays?: number;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -86,9 +88,18 @@ export function OverviewDateRange({
     { label: "Last 7 days", from: addDays(today, -6), to: today },
     { label: "Last 30 days", from: addDays(today, -29), to: today },
     { label: "This month", from: `${today.slice(0, 7)}-01`, to: today },
-  ];
+  ].filter(
+    (preset) =>
+      (Date.parse(`${preset.to}T00:00:00Z`) -
+        Date.parse(`${preset.from}T00:00:00Z`)) /
+        86_400_000 +
+        1 <=
+      maxDays,
+  );
   const days = calendarDays(viewMonth);
+  const earliestDate = addDays(today, 1 - maxDays);
   const nextMonthDisabled = addMonths(viewMonth, 1) > monthStart(today);
+  const previousMonthDisabled = addDays(dateKey(viewMonth), -1) < earliestDate;
 
   function navigate(nextFrom: string, nextTo: string) {
     setOpen(false);
@@ -103,7 +114,12 @@ export function OverviewDateRange({
   }
 
   function selectDay(key: string) {
-    if (key > today || (start && key > addDays(start, 364))) return;
+    if (
+      key < earliestDate ||
+      key > today ||
+      (start && key > addDays(start, maxDays - 1))
+    )
+      return;
     if (!start || key < start) {
       setStart(key);
       return;
@@ -181,6 +197,7 @@ export function OverviewDateRange({
                   size="icon"
                   aria-label="Previous month"
                   className="size-9 rounded-lg"
+                  disabled={previousMonthDisabled}
                   onClick={() => setViewMonth(addMonths(viewMonth, -1))}
                 >
                   <ChevronLeft className="size-4" aria-hidden="true" />
@@ -214,7 +231,9 @@ export function OverviewDateRange({
               ))}
               {days.map((key) => {
                 const disabled =
-                  key > today || Boolean(start && key > addDays(start, 364));
+                  key < earliestDate ||
+                  key > today ||
+                  Boolean(start && key > addDays(start, maxDays - 1));
                 const selectedStart = key === (start ?? from);
                 const selectedEnd = !start && key === to;
                 const inRange = !start && key > from && key < to;

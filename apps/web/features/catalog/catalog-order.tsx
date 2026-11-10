@@ -16,7 +16,7 @@ import {
   Plus,
   X,
 } from "lucide-react";
-import type { CatalogCategory } from "@pasaorder/types";
+import { type CatalogCategory } from "@pasaorder/types";
 import { Button } from "@/components/ui/button";
 import { Dialog, DropdownMenu } from "radix-ui";
 import { CatalogImage } from "./catalog-image";
@@ -36,9 +36,13 @@ function move<T>(values: T[], from: number, to: number) {
 export function CatalogOrder({
   storeId,
   categories: initialCategories,
+  activeItemCount,
+  maxActiveProducts,
 }: {
   storeId: string;
   categories: CatalogCategory[];
+  activeItemCount: number;
+  maxActiveProducts: number | null;
 }) {
   const base = `/dashboard/stores/${storeId}`;
   const [savedCategories, setSavedCategories] = useState(initialCategories);
@@ -176,6 +180,11 @@ export function CatalogOrder({
                 0,
               )}{" "}
               items
+              <span className="mt-1 block">
+                {maxActiveProducts === null
+                  ? `${activeItemCount} active items · no plan limit`
+                  : `${activeItemCount} of ${maxActiveProducts} active items on the Free plan`}
+              </span>
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -212,14 +221,29 @@ export function CatalogOrder({
                     Import
                   </Link>
                 </Button>
-                {categories.length > 0 && (
-                  <Button asChild className="h-12 rounded-xl">
-                    <Link href={`${base}/items/new`}>
-                      <Plus aria-hidden="true" />
-                      Add item
-                    </Link>
-                  </Button>
-                )}
+                {categories.length > 0 &&
+                  (maxActiveProducts === null ||
+                    activeItemCount < maxActiveProducts) && (
+                    <Button asChild className="h-12 rounded-xl">
+                      <Link href={`${base}/items/new`}>
+                        <Plus aria-hidden="true" />
+                        Add item
+                      </Link>
+                    </Button>
+                  )}
+                {maxActiveProducts !== null &&
+                  activeItemCount >= maxActiveProducts && (
+                    <p className="basis-full text-right text-xs text-muted-foreground">
+                      Free plan limit reached. Mark an item unavailable to add
+                      another, or review your plan options.
+                      <Link
+                        href="/dashboard/plan"
+                        className="ml-1 font-semibold text-primary underline-offset-4 hover:underline"
+                      >
+                        View plans
+                      </Link>
+                    </p>
+                  )}
               </>
             )}
           </div>

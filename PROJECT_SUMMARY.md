@@ -23,6 +23,7 @@ PasaOrder helps small businesses create a storefront, receive customer orders, a
 ### Customer checkout and order operations
 
 - Customer ordering from a published catalog with pickup, delivery, and dine-in options, product variants/add-ons, item instructions, and optional order notes.
+- API-enforced plans: Free supports one store, 50 active products per store, 30 days of sales reports, and no CSV export. Pro is ₱299/month and supports up to three stores, unlimited active products, 365 days of sales reports, and CSV export. Subscription uses manual payment: owners submit a reference number, an allowlisted billing admin reviews it, and approval grants one month. There is no automatic charge. Pro has a 7-day grace period, then the account returns to Free limits while retaining its existing data. Configure billing admin emails in the API environment.
 - Optional phone number, optional dine-in table number, special instructions, cash or GCash instructions, and delivery address.
 - Delivery fees are entered by the owner when confirming a delivery order.
 - Public order tracking lets customers check fulfillment and payment status using the order's private tracking link.

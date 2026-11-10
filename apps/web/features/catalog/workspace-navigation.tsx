@@ -13,6 +13,7 @@ import {
   Store,
 } from "lucide-react";
 import type { WorkspaceStore } from "@pasaorder/types";
+import type { OwnerEntitlements } from "@pasaorder/types";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { cn } from "@/lib/utils";
 import { getSocketUrl } from "@/lib/socket-url";
@@ -22,10 +23,12 @@ export function WorkspaceNavigation({
   name,
   email,
   stores,
+  plan,
 }: {
   name: string;
   email: string;
   stores: WorkspaceStore[];
+  plan: OwnerEntitlements;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -42,6 +45,7 @@ export function WorkspaceNavigation({
     stores.find((store) => store.id === routeStoreId) ??
     stores.find((store) => store.isDefault);
   const selectedStoreId = selectedStore?.id;
+  const canAddStore = plan.maxStores === null || stores.length < plan.maxStores;
   const catalogHref = selectedStore
     ? `/dashboard/stores/${selectedStore.id}`
     : "/dashboard";
@@ -310,16 +314,28 @@ export function WorkspaceNavigation({
               </p>
             )}
             <div className="border-t p-2">
-              <Link
-                href="/dashboard/new"
-                onClick={() => {
-                  if (storeMenu.current) storeMenu.current.open = false;
-                }}
-                className="flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-medium text-primary hover:bg-muted"
-              >
-                <Plus className="size-4" aria-hidden="true" />
-                Add a store
-              </Link>
+              {canAddStore ? (
+                <Link
+                  href="/dashboard/new"
+                  onClick={() => {
+                    if (storeMenu.current) storeMenu.current.open = false;
+                  }}
+                  className="flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-medium text-primary hover:bg-muted"
+                >
+                  <Plus className="size-4" aria-hidden="true" />
+                  Add a store
+                </Link>
+              ) : (
+                <Link
+                  href="/dashboard/plan"
+                  onClick={() => {
+                    if (storeMenu.current) storeMenu.current.open = false;
+                  }}
+                  className="flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-medium text-primary hover:bg-muted"
+                >
+                  View plans and limits
+                </Link>
+              )}
             </div>
           </div>
         </details>
@@ -347,6 +363,15 @@ export function WorkspaceNavigation({
             <p className="mt-1 break-all text-[13px] text-muted-foreground">
               {email}
             </p>
+            <Link
+              href="/dashboard/plan"
+              onClick={() => {
+                if (account.current) account.current.open = false;
+              }}
+              className="mt-4 flex min-h-10 items-center rounded-lg text-sm font-medium text-primary hover:underline"
+            >
+              Plan and limits
+            </Link>
             <div className="mt-5 border-t pt-4">
               <LogoutButton />
             </div>
