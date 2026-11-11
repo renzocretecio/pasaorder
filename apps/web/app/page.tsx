@@ -298,8 +298,8 @@ export default function Home() {
                     </li>
                   </ul>
                   <p className={s.pricingNote}>
-                    Pay by GCash. Each payment is reviewed manually before Pro
-                    is activated or extended. No automatic charges.
+                    Submit your payment reference number. We’ll verify it before
+                    activating or extending Pro.
                   </p>
                 </article>
               </div>
